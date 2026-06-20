@@ -70,6 +70,7 @@ Prototype controls:
 
 - `WASD` or XInput left stick moves the player.
 - Tab or Caps Lock toggles between cursor mode and camera steering mode.
+- Mouse wheel changes the player-follow camera distance from first-person to 3x the default range.
 - In cursor mode, the mouse pointer is visible. Left click the projected ground square to rotate the player toward that point and move there.
 - In camera steering mode, mouse movement rotates the player-follow camera and player movement/facing locks to the camera direction.
 - Hold Shift to sprint at the configured sprint speed scale.

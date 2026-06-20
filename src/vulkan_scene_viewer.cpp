@@ -51,6 +51,11 @@ namespace
 constexpr uint32_t kWidth = 1280;
 constexpr uint32_t kHeight = 720;
 constexpr int kMaxFramesInFlight = 1;
+constexpr float kDefaultCameraDistanceWorldUnits = 42.0f;
+constexpr float kMaxCameraDistanceWorldUnits = kDefaultCameraDistanceWorldUnits * 3.0f;
+constexpr float kMinCameraDistanceWorldUnits = 0.0f;
+constexpr float kCameraScrollZoomStepWorldUnits = 6.0f;
+constexpr float kCameraFirstPersonBlendDistanceWorldUnits = 10.0f;
 
 const std::vector<const char *> kValidationLayers = {
     "VK_LAYER_KHRONOS_validation",
@@ -281,6 +286,7 @@ private:
     uint32_t m_fpsFrames = 0;
     float m_cameraYawDegrees = 180.0f;
     float m_cameraPitchDegrees = 24.0f;
+    float m_cameraDistanceWorldUnits = kDefaultCameraDistanceWorldUnits;
     bool m_cameraSteeringEnabled = false;
     bool m_cameraToggleWasDown = false;
     bool m_mouseLookInitialized = false;
@@ -305,6 +311,12 @@ private:
     {
         auto *viewer = reinterpret_cast<VulkanSceneViewer *>(glfwGetWindowUserPointer(window));
         viewer->handleMouseLook(x, y);
+    }
+
+    static void scrollCallback(GLFWwindow *window, double, double yOffset)
+    {
+        auto *viewer = reinterpret_cast<VulkanSceneViewer *>(glfwGetWindowUserPointer(window));
+        viewer->handleMouseScroll(yOffset);
     }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -334,6 +346,7 @@ private:
         glfwSetWindowUserPointer(m_window, this);
         glfwSetFramebufferSizeCallback(m_window, framebufferResizeCallback);
         glfwSetCursorPosCallback(m_window, cursorPositionCallback);
+        glfwSetScrollCallback(m_window, scrollCallback);
         applyCursorMode();
     }
 
@@ -756,6 +769,18 @@ private:
         m_cameraPitchDegrees = std::clamp(m_cameraPitchDegrees - static_cast<float>(dy) * sensitivity,
                                           8.0f,
                                           58.0f);
+    }
+
+    void handleMouseScroll(double yOffset)
+    {
+        if (yOffset == 0.0) {
+            return;
+        }
+
+        m_cameraDistanceWorldUnits = std::clamp(
+            m_cameraDistanceWorldUnits - static_cast<float>(yOffset) * kCameraScrollZoomStepWorldUnits,
+            kMinCameraDistanceWorldUnits,
+            kMaxCameraDistanceWorldUnits);
     }
 
     void handleClickToMoveInput()
@@ -1918,9 +1943,12 @@ private:
         const glm::vec3 forward{std::sin(yaw), 0.0f, std::cos(yaw)};
         const glm::vec3 right{std::cos(yaw), 0.0f, -std::sin(yaw)};
         const glm::vec3 anchor = anchorTransform.translation + glm::vec3{0.0f, 6.5f, 0.0f};
-        constexpr float cameraDistance = 42.0f;
+        const float cameraDistance = m_cameraDistanceWorldUnits;
+        const float shoulderBlend = std::clamp(cameraDistance / kCameraFirstPersonBlendDistanceWorldUnits,
+                                               0.0f,
+                                               1.0f);
         glm::vec3 cameraOffset = -forward * (std::cos(pitch) * cameraDistance) +
-                                 right * 5.0f +
+                                 right * (5.0f * shoulderBlend) +
                                  glm::vec3{0.0f, std::sin(pitch) * cameraDistance, 0.0f};
 
         if (m_options.orbitCamera) {
@@ -1930,7 +1958,7 @@ private:
         }
 
         camera.eye = anchor + cameraOffset;
-        camera.target = anchor + forward * 10.0f + glm::vec3{0.0f, 2.0f, 0.0f};
+        camera.target = anchor + forward * 10.0f + glm::vec3{0.0f, 2.0f * shoulderBlend, 0.0f};
         return camera;
     }
 
