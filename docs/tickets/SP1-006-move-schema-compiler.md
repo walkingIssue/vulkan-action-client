@@ -1,8 +1,8 @@
 # SP1-006: Move Schema v0 and Compiler
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-006-move-schema-compiler
-Start commit: pending
+Start commit: `080eacc`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 13.3: InputFrame semantic input
@@ -89,11 +89,20 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-005 fixed tick runtime was merged.
+- 2026-06-20: Added move schema v1, compiler, intern tables, canonical JSON, valid light attack fixture, invalid diagnostics fixtures, and CTest coverage.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-content` passed: 2/2 tests.
+- `ctest --preset msvc-debug-simulation` passed: 1/1 test.
+- `ctest --preset msvc-debug-unit` passed: 9/9 tests.
+- `ctest --preset msvc-debug-characterization` passed: 2/2 tests.
+- `ctest --preset msvc-debug` passed: 11/11 tests, including `network_e2e` and `viewer_smoke`.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `7e8ae95` Add SP1-006 move schema compiler
