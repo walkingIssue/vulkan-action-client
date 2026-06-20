@@ -1,9 +1,11 @@
 # SP2-001: Combat Effects and Damage/Reactions v1
 
-Status: planned
+Status: active
 Branch: sprint02/sp2-001-combat-effects-damage-reactions
-Start commit: TBD by dispatched owner
+Start commit: pending start-doc commit
 Source plan: `docs/sprint-02-implementation-plan.md`
+Source dispatch: `C:\Users\Bartek\Documents\Playground\vulkan-agent-comms\claims\SP2-001.md`
+Required base: `origin/main` `8f816f3 Merge Sprint 02 planning docs`
 Source result docs:
 - `docs/tickets/SP1-007-combat-runtime-v0_result.md`
 - `docs/tickets/SP1-008-primitive-combat-collision_result.md`
@@ -94,6 +96,7 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Planned by `SP2-PLAN`. Implementation not yet dispatched.
+- 2026-06-20: Vera dispatched by Mia for SP2-001 from `origin/main` `8f816f3`; start-doc refresh committed before code edits on branch `sprint02/sp2-001-combat-effects-damage-reactions`.
 
 ## Verification Results
 
