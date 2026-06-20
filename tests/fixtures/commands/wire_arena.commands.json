@@ -1,0 +1,105 @@
+[
+  {
+    "command": "newFromTemplate",
+    "template": "scene.template.basic_render",
+    "assetGuid": "map-guid-sp1-012-wire-arena",
+    "logicalId": "map.sp1_012_wire_arena"
+  },
+  {
+    "command": "setBounds",
+    "min": [-12.0, -1.0, -12.0],
+    "max": [12.0, 6.0, 12.0],
+    "killHeight": -6.0
+  },
+  {
+    "command": "createPrimitive",
+    "id": "arena_floor",
+    "name": "Arena Floor",
+    "type": "box",
+    "size": [16.0, 0.5, 16.0]
+  },
+  {
+    "command": "setTransform",
+    "object": "arena_floor",
+    "position": [0.0, -0.25, 0.0],
+    "rotationDegrees": [0.0, 0.0, 0.0],
+    "scale": [1.0, 1.0, 1.0]
+  },
+  {
+    "command": "setBaseColor",
+    "object": "arena_floor",
+    "value": [0.24, 0.30, 0.34, 1.0]
+  },
+  {
+    "command": "addCollider",
+    "object": "arena_floor",
+    "type": "box",
+    "size": [16.0, 0.5, 16.0],
+    "mode": "static",
+    "layer": "world",
+    "mask": ["character", "weapon"]
+  },
+  {
+    "command": "createPrimitive",
+    "id": "center_blocker",
+    "name": "Center Blocker",
+    "type": "box",
+    "size": [2.0, 2.0, 2.0]
+  },
+  {
+    "command": "setTransform",
+    "object": "center_blocker",
+    "position": [3.0, 1.0, 0.0],
+    "rotationDegrees": [0.0, 30.0, 0.0],
+    "scale": [1.0, 1.0, 1.0]
+  },
+  {
+    "command": "setBaseColor",
+    "object": "center_blocker",
+    "value": [0.58, 0.38, 0.20, 1.0]
+  },
+  {
+    "command": "addCollider",
+    "object": "center_blocker",
+    "type": "box",
+    "size": [2.0, 2.0, 2.0],
+    "mode": "static",
+    "layer": "world",
+    "mask": ["character"]
+  },
+  {
+    "command": "addSpawnPoint",
+    "id": "player_spawn",
+    "team": "player",
+    "position": [0.0, 0.0, 6.0],
+    "yawDegrees": 180.0,
+    "enabled": true,
+    "tags": ["player", "default"]
+  },
+  {
+    "command": "addSpawnPoint",
+    "id": "enemy_spawn",
+    "team": "enemy",
+    "position": [0.0, 0.0, -6.0],
+    "yawDegrees": 0.0,
+    "enabled": true,
+    "tags": ["enemy", "dummy"]
+  },
+  {
+    "command": "saveAs",
+    "path": "test-artifacts/sp1_012_wire_arena.map.json"
+  },
+  {
+    "command": "reopen"
+  },
+  {
+    "command": "compile"
+  },
+  {
+    "command": "playTicks",
+    "ticks": 300
+  },
+  {
+    "command": "stop"
+  }
+]
