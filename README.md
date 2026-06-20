@@ -85,12 +85,25 @@ Movement tuning and key bindings live in `config/controls/player_control_profile
 Run the relay server and two optimistic clients:
 
 ```powershell
+.\tools\start-network-clients.ps1
+```
+
+Or run the pieces manually:
+
+```powershell
+.\tools\build.ps1
 .\build\msvc-debug\udp_state_server.exe --bind 127.0.0.1:40000
 .\build\msvc-debug\vulkan_scene_viewer.exe --net-client-id 1 --net-server 127.0.0.1:40000
 .\build\msvc-debug\vulkan_scene_viewer.exe --net-client-id 2 --net-server 127.0.0.1:40000
 ```
 
-The server only validates and fans out bitpacked actor snapshots. Client `1` owns the first character and client `2` owns the second character.
+Clients explicitly connect before snapshots are accepted and disconnect on shutdown. The server accepts an arbitrary number of client sessions and fans out validated packets to connected peers. The current viewer maps client `1` to the first character and client `2` to the second character.
+
+Run the regression suite:
+
+```powershell
+.\tools\test.ps1
+```
 
 ## Architecture Notes
 

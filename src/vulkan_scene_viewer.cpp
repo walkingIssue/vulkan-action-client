@@ -586,7 +586,15 @@ private:
         }
 
         bool applied = false;
-        for (const vac::net::ActorSnapshot &snapshot : m_networkClient->receiveSnapshots()) {
+        const vac::net::SnapshotClient::ReceiveBatch batch = m_networkClient->receive();
+        for (const vac::net::ServerEventPacket &event : batch.events) {
+            const char *eventLabel = event.event == vac::net::ServerEventKind::clientConnected
+                ? "connected"
+                : "disconnected";
+            spdlog::info("Network peer {} {}", event.clientId, eventLabel);
+        }
+
+        for (const vac::net::ActorSnapshot &snapshot : batch.snapshots) {
             const auto actorIt = m_networkActorByClientId.find(snapshot.clientId);
             if (actorIt == m_networkActorByClientId.end() || actorIt->second >= m_actorStates.size()) {
                 continue;

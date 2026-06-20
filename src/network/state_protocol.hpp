@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <variant>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -16,7 +17,16 @@ inline constexpr size_t kMaxDatagramBytes = 256;
 
 enum class PacketKind : uint8_t
 {
-    actorSnapshot = 1,
+    connect = 1,
+    disconnect = 2,
+    actorSnapshot = 3,
+    serverEvent = 4,
+};
+
+enum class ServerEventKind : uint8_t
+{
+    clientConnected = 1,
+    clientDisconnected = 2,
 };
 
 enum SnapshotFlags : uint8_t
@@ -35,6 +45,31 @@ struct ActorSnapshot
     float yawDegrees = 0.0f;
 };
 
+struct ConnectPacket
+{
+    uint8_t clientId = 0;
+    uint16_t sequence = 0;
+};
+
+struct DisconnectPacket
+{
+    uint8_t clientId = 0;
+    uint16_t sequence = 0;
+};
+
+struct ServerEventPacket
+{
+    ServerEventKind event = ServerEventKind::clientConnected;
+    uint8_t clientId = 0;
+    uint16_t sequence = 0;
+};
+
+using Packet = std::variant<ConnectPacket, DisconnectPacket, ActorSnapshot, ServerEventPacket>;
+
+std::vector<std::byte> encodeConnectPacket(const ConnectPacket &packet);
+std::vector<std::byte> encodeDisconnectPacket(const DisconnectPacket &packet);
 std::vector<std::byte> encodeActorSnapshot(const ActorSnapshot &snapshot);
+std::vector<std::byte> encodeServerEventPacket(const ServerEventPacket &packet);
+std::optional<Packet> decodePacket(std::span<const std::byte> packet);
 std::optional<ActorSnapshot> decodeActorSnapshot(std::span<const std::byte> packet);
 } // namespace vac::net

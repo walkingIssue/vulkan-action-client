@@ -9,12 +9,14 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <utility>
-#include <vector>
+#include <variant>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include "network/snapshot_relay.hpp"
 #include "network/state_protocol.hpp"
 #include "network/udp_socket.hpp"
 
@@ -27,11 +29,14 @@ struct ServerOptions
     uint32_t dumpPackets = 128;
 };
 
-struct ClientRecord
+template <typename... Visitors>
+struct Overloaded : Visitors...
 {
-    vac::net::Endpoint endpoint;
-    uint8_t clientId = 0;
+    using Visitors::operator()...;
 };
+
+template <typename... Visitors>
+Overloaded(Visitors...) -> Overloaded<Visitors...>;
 
 std::pair<std::string, uint16_t> splitHostPort(const std::string &hostAndPort)
 {
@@ -64,12 +69,37 @@ ServerOptions parseOptions(int argc, char **argv)
     return options;
 }
 
-std::vector<ClientRecord>::iterator findClient(std::vector<ClientRecord> &clients,
-                                               const vac::net::Endpoint &endpoint)
+void logAcceptedPacket(const vac::net::Packet &packet,
+                       const std::string &senderKey,
+                       uint32_t dumpPackets,
+                       uint32_t &packetsDumped)
 {
-    return std::find_if(clients.begin(), clients.end(), [&](const ClientRecord &client) {
-        return vac::net::sameEndpoint(client.endpoint, endpoint);
-    });
+    std::visit(Overloaded{
+                   [&](const vac::net::ConnectPacket &connect) {
+                       spdlog::info("client {} connected from {}", connect.clientId, senderKey);
+                   },
+                   [&](const vac::net::DisconnectPacket &disconnect) {
+                       spdlog::info("client {} disconnected from {}", disconnect.clientId, senderKey);
+                   },
+                   [&](const vac::net::ActorSnapshot &snapshot) {
+                       if (packetsDumped >= dumpPackets) {
+                           return;
+                       }
+
+                       ++packetsDumped;
+                       spdlog::info("snapshot client={} tick={} pos=({:.2f},{:.2f},{:.2f}) yaw={:.1f} flags=0x{:02x}",
+                                    snapshot.clientId,
+                                    snapshot.tick,
+                                    snapshot.position.x,
+                                    snapshot.position.y,
+                                    snapshot.position.z,
+                                    snapshot.yawDegrees,
+                                    snapshot.flags);
+                   },
+                   [](const vac::net::ServerEventPacket &) {
+                   },
+               },
+               packet);
 }
 } // namespace
 
@@ -83,55 +113,47 @@ int main(int argc, char **argv)
         socket.open(bindHost, bindPort, false);
 
         spdlog::info("UDP state relay listening on {}", options.bind);
-        std::vector<ClientRecord> clients;
-        uint32_t packetsReceived = 0;
+
+        vac::net::SnapshotRelay relay;
+        std::unordered_map<std::string, vac::net::Endpoint> endpointsByKey;
+        uint32_t packetsAccepted = 0;
         uint32_t packetsDumped = 0;
 
-        while (options.maxPackets == 0 || packetsReceived < options.maxPackets) {
+        while (options.maxPackets == 0 || packetsAccepted < options.maxPackets) {
             std::optional<vac::net::Datagram> datagram = socket.receive();
             if (!datagram.has_value()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
 
-            const std::optional<vac::net::ActorSnapshot> snapshot =
-                vac::net::decodeActorSnapshot(std::span<const std::byte>{datagram->bytes.data(), datagram->size});
-            if (!snapshot.has_value() || snapshot->clientId == 0) {
+            const std::string senderKey = vac::net::endpointToString(datagram->sender);
+            endpointsByKey[senderKey] = datagram->sender;
+
+            const vac::net::RelayResult result = relay.ingest(
+                senderKey,
+                std::span<const std::byte>{datagram->bytes.data(), datagram->size});
+            if (!result.packet.has_value()) {
                 continue;
             }
 
-            ++packetsReceived;
-            auto clientIt = findClient(clients, datagram->sender);
-            if (clientIt == clients.end()) {
-                clients.push_back({datagram->sender, snapshot->clientId});
-                spdlog::info("Registered client {} at {}",
-                             snapshot->clientId,
-                             vac::net::endpointToString(datagram->sender));
-            } else {
-                clientIt->clientId = snapshot->clientId;
+            if (!result.accepted) {
+                spdlog::warn("Rejected packet from {}", senderKey);
+                continue;
             }
 
-            if (packetsDumped < options.dumpPackets) {
-                ++packetsDumped;
-                spdlog::info("snapshot client={} tick={} pos=({:.2f},{:.2f},{:.2f}) yaw={:.1f} flags=0x{:02x}",
-                             snapshot->clientId,
-                             snapshot->tick,
-                             snapshot->position.x,
-                             snapshot->position.y,
-                             snapshot->position.z,
-                             snapshot->yawDegrees,
-                             snapshot->flags);
-            }
+            ++packetsAccepted;
+            logAcceptedPacket(*result.packet, senderKey, options.dumpPackets, packetsDumped);
 
-            for (const ClientRecord &client : clients) {
-                if (vac::net::sameEndpoint(client.endpoint, datagram->sender)) {
+            for (const vac::net::RelayOutput &output : result.outputs) {
+                const auto endpointIt = endpointsByKey.find(output.endpointKey);
+                if (endpointIt == endpointsByKey.end()) {
                     continue;
                 }
-                socket.sendTo(std::span<const std::byte>{datagram->bytes.data(), datagram->size}, client.endpoint);
+                socket.sendTo(output.packet, endpointIt->second);
             }
         }
 
-        spdlog::info("UDP state relay exiting after {} received packets", packetsReceived);
+        spdlog::info("UDP state relay exiting after {} accepted packets", packetsAccepted);
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "udp_state_server failed: " << error.what() << '\n';

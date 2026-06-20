@@ -2,40 +2,76 @@
 
 This slice is a UDP relay, not an authoritative server.
 
-Clients simulate and render optimistically. Each client owns one actor, sends compact snapshots of that actor every fixed tick, and applies remote snapshots as presentation state for the other actor. The server only learns client endpoints and fans validated packets out to the other clients. There are no acks, no resends, no rollback, and no server-side combat decisions yet.
+Clients simulate and render optimistically. Each client owns one actor, sends compact snapshots of that actor every fixed tick, and applies remote snapshots as presentation state for the other actor. The server learns client endpoints through explicit connect packets and fans validated packets out to the other clients. There are no acks, no resends, no rollback, and no server-side combat decisions yet.
+Clients now enter the relay through an explicit connect packet and leave through an explicit disconnect packet. Actor snapshots are accepted only from the endpoint that owns the snapshot client id.
 
 ## Current Flow
 
 ```text
 client 1 fixed tick
+  -> ConnectPacket once at client startup
   -> local actor transform
   -> bitpacked ActorSnapshot
   -> UDP relay server
   -> client 2 remote actor transform
+  -> DisconnectPacket on shutdown
 
 client 2 fixed tick
+  -> ConnectPacket once at client startup
   -> local actor transform
   -> bitpacked ActorSnapshot
   -> UDP relay server
   -> client 1 remote actor transform
+  -> DisconnectPacket on shutdown
 ```
 
-Client id `1` owns `player_preview`. Client id `2` owns `sparring_partner`. In network mode, the old local arrow-key sparring control is disabled so the remote actor is driven by received packets.
+The relay can track any number of connected client ids. The current viewer only has render mappings for client id `1`, which owns `player_preview`, and client id `2`, which owns `sparring_partner`. In network mode, the old local arrow-key sparring control is disabled so the remote actor is driven by received packets.
 
 ## Packet
 
-The first packet type is `ActorSnapshot`.
+Every packet starts with the same header:
 
 ```text
 magic: 32 bits
 version: 4 bits
 kind: 4 bits
+```
+
+Packet kinds:
+
+```text
+1: ConnectPacket
+2: DisconnectPacket
+3: ActorSnapshot
+4: ServerEventPacket
+```
+
+`ConnectPacket` and `DisconnectPacket`:
+
+```text
+client id: 8 bits
+sequence: 16 bits
+```
+
+`ActorSnapshot`:
+
+```text
 client id: 8 bits
 tick: 16 bits
 flags: 8 bits
 position x/y/z: 22 bits each, signed, centimeter scale
 yaw: 16 bits, normalized 0..360 degrees
 ```
+
+`ServerEventPacket`:
+
+```text
+event: 8 bits
+client id: 8 bits
+sequence: 16 bits
+```
+
+Server events currently announce peer connect and disconnect.
 
 The codec writes fields manually through a bit writer. It does not send compiler-packed structs.
 
@@ -45,12 +81,19 @@ This keeps the transport separate from combat. The network library owns UDP sock
 
 Later, the server can become authoritative by replacing relay fanout with command intake, fixed-tick simulation, state deltas, prediction correction, and eventually rollback or reconciliation. This first step is deliberately only enough to put two optimistic clients on the wire.
 
+The relay session rules live in a pure `SnapshotRelay` core so unit tests can assert ingress behavior without real sockets. The UDP server wraps that core with endpoint serialization and datagram send/receive.
+
 ## Running
 
 ```powershell
+.\tools\build.ps1
 .\build\msvc-debug\udp_state_server.exe --bind 127.0.0.1:40000 --dump-packets 128
 .\build\msvc-debug\vulkan_scene_viewer.exe --net-client-id 1 --net-server 127.0.0.1:40000
 .\build\msvc-debug\vulkan_scene_viewer.exe --net-client-id 2 --net-server 127.0.0.1:40000
 ```
 
-For finite smoke tests, add `--frames 180` to each viewer and `--max-packets 128` to the server.
+For automated regression coverage:
+
+```powershell
+.\tools\test.ps1
+```

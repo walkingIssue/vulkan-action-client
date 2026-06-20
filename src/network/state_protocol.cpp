@@ -116,27 +116,16 @@ float dequantizeYaw(uint32_t value)
 {
     return (static_cast<float>(value) / static_cast<float>(kYawQuantization)) * 360.0f;
 }
-} // namespace
 
-std::vector<std::byte> encodeActorSnapshot(const ActorSnapshot &snapshot)
+void writeHeader(BitWriter &writer, PacketKind kind)
 {
-    BitWriter writer;
     writer.writeBits(kProtocolMagic, 32);
     writer.writeBits(kProtocolVersion, 4);
-    writer.writeBits(static_cast<uint8_t>(PacketKind::actorSnapshot), 4);
-    writer.writeBits(snapshot.clientId, 8);
-    writer.writeBits(snapshot.tick, 16);
-    writer.writeBits(snapshot.flags, 8);
-    writer.writeSigned(quantizePosition(snapshot.position.x), kPositionBits);
-    writer.writeSigned(quantizePosition(snapshot.position.y), kPositionBits);
-    writer.writeSigned(quantizePosition(snapshot.position.z), kPositionBits);
-    writer.writeBits(quantizeYaw(snapshot.yawDegrees), 16);
-    return std::move(writer).finish();
+    writer.writeBits(static_cast<uint8_t>(kind), 4);
 }
 
-std::optional<ActorSnapshot> decodeActorSnapshot(std::span<const std::byte> packet)
+std::optional<PacketKind> readHeader(BitReader &reader)
 {
-    BitReader reader(packet);
     const std::optional<uint32_t> magic = reader.readBits(32);
     const std::optional<uint32_t> version = reader.readBits(4);
     const std::optional<uint32_t> kind = reader.readBits(4);
@@ -144,11 +133,45 @@ std::optional<ActorSnapshot> decodeActorSnapshot(std::span<const std::byte> pack
         !version.has_value() ||
         !kind.has_value() ||
         *magic != kProtocolMagic ||
-        *version != kProtocolVersion ||
-        *kind != static_cast<uint8_t>(PacketKind::actorSnapshot)) {
+        *version != kProtocolVersion) {
         return std::nullopt;
     }
 
+    switch (static_cast<PacketKind>(*kind)) {
+    case PacketKind::connect:
+    case PacketKind::disconnect:
+    case PacketKind::actorSnapshot:
+    case PacketKind::serverEvent:
+        return static_cast<PacketKind>(*kind);
+    }
+
+    return std::nullopt;
+}
+
+std::optional<ConnectPacket> readConnectPacket(BitReader &reader)
+{
+    const std::optional<uint32_t> clientId = reader.readBits(8);
+    const std::optional<uint32_t> sequence = reader.readBits(16);
+    if (!clientId.has_value() || !sequence.has_value()) {
+        return std::nullopt;
+    }
+
+    return ConnectPacket{static_cast<uint8_t>(*clientId), static_cast<uint16_t>(*sequence)};
+}
+
+std::optional<DisconnectPacket> readDisconnectPacket(BitReader &reader)
+{
+    const std::optional<uint32_t> clientId = reader.readBits(8);
+    const std::optional<uint32_t> sequence = reader.readBits(16);
+    if (!clientId.has_value() || !sequence.has_value()) {
+        return std::nullopt;
+    }
+
+    return DisconnectPacket{static_cast<uint8_t>(*clientId), static_cast<uint16_t>(*sequence)};
+}
+
+std::optional<ActorSnapshot> readActorSnapshot(BitReader &reader)
+{
     const std::optional<uint32_t> clientId = reader.readBits(8);
     const std::optional<uint32_t> tick = reader.readBits(16);
     const std::optional<uint32_t> flags = reader.readBits(8);
@@ -173,5 +196,113 @@ std::optional<ActorSnapshot> decodeActorSnapshot(std::span<const std::byte> pack
         {dequantizePosition(*x), dequantizePosition(*y), dequantizePosition(*z)},
         dequantizeYaw(*yaw),
     };
+}
+
+std::optional<ServerEventPacket> readServerEventPacket(BitReader &reader)
+{
+    const std::optional<uint32_t> event = reader.readBits(8);
+    const std::optional<uint32_t> clientId = reader.readBits(8);
+    const std::optional<uint32_t> sequence = reader.readBits(16);
+    if (!event.has_value() || !clientId.has_value() || !sequence.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto kind = static_cast<ServerEventKind>(*event);
+    if (kind != ServerEventKind::clientConnected && kind != ServerEventKind::clientDisconnected) {
+        return std::nullopt;
+    }
+
+    return ServerEventPacket{kind, static_cast<uint8_t>(*clientId), static_cast<uint16_t>(*sequence)};
+}
+} // namespace
+
+std::vector<std::byte> encodeConnectPacket(const ConnectPacket &packet)
+{
+    BitWriter writer;
+    writeHeader(writer, PacketKind::connect);
+    writer.writeBits(packet.clientId, 8);
+    writer.writeBits(packet.sequence, 16);
+    return std::move(writer).finish();
+}
+
+std::vector<std::byte> encodeDisconnectPacket(const DisconnectPacket &packet)
+{
+    BitWriter writer;
+    writeHeader(writer, PacketKind::disconnect);
+    writer.writeBits(packet.clientId, 8);
+    writer.writeBits(packet.sequence, 16);
+    return std::move(writer).finish();
+}
+
+std::vector<std::byte> encodeActorSnapshot(const ActorSnapshot &snapshot)
+{
+    BitWriter writer;
+    writeHeader(writer, PacketKind::actorSnapshot);
+    writer.writeBits(snapshot.clientId, 8);
+    writer.writeBits(snapshot.tick, 16);
+    writer.writeBits(snapshot.flags, 8);
+    writer.writeSigned(quantizePosition(snapshot.position.x), kPositionBits);
+    writer.writeSigned(quantizePosition(snapshot.position.y), kPositionBits);
+    writer.writeSigned(quantizePosition(snapshot.position.z), kPositionBits);
+    writer.writeBits(quantizeYaw(snapshot.yawDegrees), 16);
+    return std::move(writer).finish();
+}
+
+std::vector<std::byte> encodeServerEventPacket(const ServerEventPacket &packet)
+{
+    BitWriter writer;
+    writeHeader(writer, PacketKind::serverEvent);
+    writer.writeBits(static_cast<uint8_t>(packet.event), 8);
+    writer.writeBits(packet.clientId, 8);
+    writer.writeBits(packet.sequence, 16);
+    return std::move(writer).finish();
+}
+
+std::optional<Packet> decodePacket(std::span<const std::byte> packet)
+{
+    BitReader reader(packet);
+    const std::optional<PacketKind> kind = readHeader(reader);
+    if (!kind.has_value()) {
+        return std::nullopt;
+    }
+
+    switch (*kind) {
+    case PacketKind::connect:
+        if (const std::optional<ConnectPacket> connect = readConnectPacket(reader)) {
+            return *connect;
+        }
+        break;
+    case PacketKind::disconnect:
+        if (const std::optional<DisconnectPacket> disconnect = readDisconnectPacket(reader)) {
+            return *disconnect;
+        }
+        break;
+    case PacketKind::actorSnapshot:
+        if (const std::optional<ActorSnapshot> snapshot = readActorSnapshot(reader)) {
+            return *snapshot;
+        }
+        break;
+    case PacketKind::serverEvent:
+        if (const std::optional<ServerEventPacket> event = readServerEventPacket(reader)) {
+            return *event;
+        }
+        break;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<ActorSnapshot> decodeActorSnapshot(std::span<const std::byte> packet)
+{
+    const std::optional<Packet> decoded = decodePacket(packet);
+    if (!decoded.has_value()) {
+        return std::nullopt;
+    }
+
+    if (const auto *snapshot = std::get_if<ActorSnapshot>(&*decoded)) {
+        return *snapshot;
+    }
+
+    return std::nullopt;
 }
 } // namespace vac::net

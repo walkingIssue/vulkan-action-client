@@ -37,6 +37,7 @@ target_link_libraries(scene_core PUBLIC
 
 add_library(network_core
     src/network/snapshot_client.cpp
+    src/network/snapshot_relay.cpp
     src/network/state_protocol.cpp
     src/network/udp_socket.cpp
 )
@@ -56,6 +57,8 @@ target_link_libraries(network_core PUBLIC
 if(WIN32)
     target_link_libraries(network_core PUBLIC Ws2_32)
 endif()
+
+include(CTest)
 
 function(add_shader TARGET_NAME SOURCE_FILE)
     set(OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/shaders/${TARGET_NAME}.spv")
@@ -149,4 +152,48 @@ target_link_libraries(vulkan_scene_viewer PRIVATE
 
 if(WIN32)
     target_link_libraries(vulkan_scene_viewer PRIVATE Xinput.lib)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(network_protocol_tests
+        tests/network_protocol_tests.cpp
+    )
+
+    target_compile_features(network_protocol_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(network_protocol_tests PRIVATE
+        network_core
+    )
+
+    add_test(NAME network_protocol_tests COMMAND network_protocol_tests)
+
+    add_executable(snapshot_relay_tests
+        tests/snapshot_relay_tests.cpp
+    )
+
+    target_compile_features(snapshot_relay_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(snapshot_relay_tests PRIVATE
+        network_core
+    )
+
+    add_test(NAME snapshot_relay_tests COMMAND snapshot_relay_tests)
+
+    add_executable(network_e2e_client
+        tests/network_e2e_client.cpp
+    )
+
+    target_compile_features(network_e2e_client PRIVATE cxx_std_20)
+
+    target_link_libraries(network_e2e_client PRIVATE
+        network_core
+    )
+
+    add_test(
+        NAME network_e2e
+        COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+                -File "${CMAKE_CURRENT_SOURCE_DIR}/tools/test-network-e2e.ps1"
+                -BuildDir "$<TARGET_FILE_DIR:network_e2e_client>"
+    )
+    set_tests_properties(network_e2e PROPERTIES TIMEOUT 30 LABELS e2e)
 endif()
