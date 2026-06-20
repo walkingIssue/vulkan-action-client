@@ -1,0 +1,68 @@
+{
+  "name": "bootstrap_arena",
+  "models": [
+    {
+      "id": "paladin",
+      "mesh_count": 31,
+      "material_count": 6,
+      "animation_count": 0,
+      "vertex_count": 64644,
+      "triangle_count": 97272,
+      "local_bounds": {
+        "min": [-3.996, 0.002, -1.075],
+        "max": [3.996, 12.945, 1.185]
+      }
+    }
+  ],
+  "procedural": [
+    {
+      "id": "arena_floor",
+      "name": "Arena Floor",
+      "type": "floor",
+      "size": [420.0, 420.0],
+      "transform": {
+        "translation": [0.0, -0.02, 0.0],
+        "rotation_degrees": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "world_bounds": {
+        "min": [-210.0, -0.03, -210.0],
+        "max": [210.0, -0.01, 210.0]
+      }
+    }
+  ],
+  "instances": [
+    {
+      "id": "player_preview",
+      "name": "Player Preview",
+      "model": "paladin",
+      "transform": {
+        "translation": [0.0, 0.0, 0.0],
+        "rotation_degrees": [0.0, 180.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "world_bounds": {
+        "min": [-3.996, 0.002, -1.185],
+        "max": [3.996, 12.945, 1.075]
+      }
+    },
+    {
+      "id": "sparring_partner",
+      "name": "Sparring Partner",
+      "model": "paladin",
+      "transform": {
+        "translation": [0.0, 0.0, -14.0],
+        "rotation_degrees": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "world_bounds": {
+        "min": [-3.996, 0.002, -15.075],
+        "max": [3.996, 12.945, -12.815]
+      }
+    }
+  ],
+  "world_bounds": {
+    "min": [-210.0, -0.03, -210.0],
+    "max": [210.0, 12.945, 210.0]
+  }
+}

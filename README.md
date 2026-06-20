@@ -55,6 +55,8 @@ ctest --preset msvc-debug-unit
 ctest --preset msvc-debug-network
 ctest --preset msvc-debug-e2e
 ctest --preset msvc-debug-combat
+ctest --preset msvc-debug-characterization
+ctest --preset msvc-debug-viewer
 ```
 
 The project uses vcpkg manifest mode through `CMakePresets.json`; CMake runs vcpkg install during configure. The PowerShell scripts in `tools/` are convenience wrappers around the same preset path.

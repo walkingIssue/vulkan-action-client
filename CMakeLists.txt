@@ -268,6 +268,23 @@ if(BUILD_TESTING)
         LABELS "unit;network;relay"
     )
 
+    add_executable(characterization_tests
+        tests/characterization_tests.cpp
+    )
+
+    target_compile_features(characterization_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(characterization_tests PRIVATE
+        scene_core
+        network_core
+    )
+
+    add_test(NAME characterization_tests COMMAND characterization_tests)
+    set_tests_properties(characterization_tests PROPERTIES
+        TIMEOUT 20
+        LABELS "unit;characterization;scene;combat;movement;network;protocol;relay"
+    )
+
     add_executable(network_e2e_client
         tests/network_e2e_client.cpp
     )
@@ -287,5 +304,16 @@ if(BUILD_TESTING)
     set_tests_properties(network_e2e PROPERTIES
         TIMEOUT 30
         LABELS "network;e2e"
+    )
+
+    add_test(
+        NAME viewer_smoke
+        COMMAND vulkan_scene_viewer
+                --frames 3
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/viewer_smoke_result.json"
+    )
+    set_tests_properties(viewer_smoke PROPERTIES
+        TIMEOUT 30
+        LABELS "viewer;smoke;characterization"
     )
 endif()
