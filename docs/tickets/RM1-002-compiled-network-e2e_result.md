@@ -3,7 +3,9 @@
 Status: ready for merge
 Branch: `mitigation01/rm1-002-compiled-network-e2e`
 Start commit: `9f06853`
-Implementation commit after RM1-003 rebase: `d6d2a20`
+Implementation commits after RM1-003 rebase:
+- `d6d2a20` Add compiled network E2E runner
+- `2a100cc` Stabilize network E2E disconnect oracle
 
 ## What Changed
 
