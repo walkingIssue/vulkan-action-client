@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: sprint01/sp1-011-visual-combat-lab
-Start commit: pending
+Start commit: `713afe1`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 9.2: Required panels
