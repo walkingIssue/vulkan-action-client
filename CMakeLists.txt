@@ -34,6 +34,26 @@ target_link_libraries(content_core PUBLIC
     nlohmann_json::nlohmann_json
 )
 
+add_library(animation_core
+    src/animation/proxy_animation.cpp
+)
+
+target_compile_features(animation_core PUBLIC cxx_std_20)
+
+target_include_directories(animation_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(animation_core PUBLIC
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(animation_core PUBLIC
+    content_core
+    glm::glm
+    nlohmann_json::nlohmann_json
+)
+
 add_library(scene_core
     src/config/control_profile.cpp
     src/combat/combat_simulation.cpp
@@ -317,6 +337,22 @@ if(BUILD_TESTING)
     set_tests_properties(combat_collision_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;combat;collision"
+    )
+
+    add_executable(proxy_animation_tests
+        tests/proxy_animation_tests.cpp
+    )
+
+    target_compile_features(proxy_animation_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(proxy_animation_tests PRIVATE
+        animation_core
+    )
+
+    add_test(NAME proxy_animation_tests COMMAND proxy_animation_tests)
+    set_tests_properties(proxy_animation_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;animation;combat"
     )
 
     add_executable(movement_behavior_tests
