@@ -25,6 +25,12 @@ glm::vec2 forwardFromYaw(float yawDegrees)
     return {std::sin(yawRadians), std::cos(yawRadians)};
 }
 
+glm::vec2 rightFromYaw(float yawDegrees)
+{
+    const float yawRadians = glm::radians(yawDegrees);
+    return {std::cos(yawRadians), -std::sin(yawRadians)};
+}
+
 void clampToArena(Transform &transform, ArenaLimits arena)
 {
     const glm::vec2 allowed = glm::max(arena.halfExtents - glm::vec2{arena.edgeInset}, glm::vec2{0.0f});
@@ -57,19 +63,44 @@ bool applyCharacterLocomotion(ActorState &actor,
     Transform &transform = actor.currentTransform;
 
     if (wantsForwardMotion) {
-        transform.rotationDegrees.y -= turnAxis * kTurnSpeedDegreesPerSecond * deltaSeconds;
+        transform.rotationDegrees.y += turnAxis * kTurnSpeedDegreesPerSecond * deltaSeconds;
 
         const glm::vec2 direction = forwardFromYaw(transform.rotationDegrees.y) * forwardAxis;
         transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
         transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
     } else {
-        transform.rotationDegrees.y = idleControlFrame.yawDegrees - turnAxis * 90.0f;
+        transform.rotationDegrees.y = idleControlFrame.yawDegrees + turnAxis * 90.0f;
 
         const glm::vec2 direction = forwardFromYaw(transform.rotationDegrees.y);
         transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
         transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
     }
 
+    clampToArena(transform, arena);
+    return true;
+}
+
+bool applyCameraLockedLocomotion(ActorState &actor,
+                                 LocalMoveIntent intent,
+                                 ControlFrame cameraFrame,
+                                 float deltaSeconds,
+                                 ArenaLimits arena)
+{
+    Transform &transform = actor.currentTransform;
+    const bool rotated = std::abs(transform.rotationDegrees.y - cameraFrame.yawDegrees) > 0.001f;
+    transform.rotationDegrees.y = cameraFrame.yawDegrees;
+
+    const glm::vec2 axes = normalizedDirection(intent.axes);
+    if (glm::dot(axes, axes) <= 0.0001f) {
+        return rotated;
+    }
+
+    const glm::vec2 direction = normalizedDirection(
+        rightFromYaw(cameraFrame.yawDegrees) * axes.x +
+        forwardFromYaw(cameraFrame.yawDegrees) * axes.y);
+
+    transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
+    transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
     clampToArena(transform, arena);
     return true;
 }

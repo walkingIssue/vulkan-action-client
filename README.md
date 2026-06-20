@@ -70,10 +70,11 @@ Prototype controls:
 
 - `WASD` or XInput left stick moves the player.
 - Mouse rotates the player-follow camera.
+- Hold right mouse button to snap the player facing to the camera and use camera-relative strafing.
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. W/S advance along the character facing; A/D steer while advancing, or start a side move from idle relative to the camera.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Without RMB, W/S advance along the character facing and A/D steer or side-start. With RMB held, movement is camera-relative with strafing.
 
 ## Architecture Notes
 

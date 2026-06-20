@@ -52,7 +52,7 @@ The simulation can produce compact presentation commands each tick. The renderer
 
 Movement speed belongs to combat state, not rendering. Inputs should be dimensionless intent such as "move northeast at full stick tilt"; the combat layer turns that into velocity using authored constants.
 
-The intent should carry an explicit frame conversion. Raw controls are local axes; character facing, camera yaw, or a lock-on target frame turns those axes into world-space movement when needed. For this prototype, forward motion is character-relative, A/D steering uses a turn rate, and idle A/D side-starts use the camera frame. That keeps "what the player meant" separate from "which way world +Z happens to be."
+The intent should carry an explicit frame conversion. Raw controls are local axes; character facing, camera yaw, or a lock-on target frame turns those axes into world-space movement when needed. For this prototype, forward motion is character-relative, A/D steering uses a turn rate, idle A/D side-starts use the camera frame, and RMB camera-lock uses camera-relative strafing. That keeps "what the player meant" separate from "which way world +Z happens to be."
 
 For now the prototype uses world units per second:
 

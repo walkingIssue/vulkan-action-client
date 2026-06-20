@@ -19,7 +19,7 @@ DirectInput exists and is COM-based, but it is legacy for most modern game use. 
 
 For the first controller path, use XInput. It is narrow, stable, and enough for Xbox-compatible pads while we are still building the combat input model.
 
-The current scene viewer has the first thin version of this: XInput left stick and `WASD` drive character locomotion, while mouse controls the player-follow camera. W/S advance along the character facing. A/D steer while the character is advancing; from idle they choose a side-start direction relative to the camera. This is prototype plumbing, not the final combat input API.
+The current scene viewer has the first thin version of this: XInput left stick and `WASD` drive character locomotion, while mouse controls the player-follow camera. W/S advance along the character facing. A/D steer while the character is advancing; from idle they choose a side-start direction relative to the camera. Holding RMB snaps player facing to the camera and switches movement to camera-relative strafing. This is prototype plumbing, not the final combat input API.
 
 ## Desired Engine Shape
 
