@@ -112,6 +112,16 @@
       }
     },
     {
+      "name": "msvc-debug-simulation",
+      "displayName": "MSVC Debug Simulation Tests",
+      "inherits": "msvc-debug",
+      "filter": {
+        "include": {
+          "label": "simulation"
+        }
+      }
+    },
+    {
       "name": "msvc-debug-characterization",
       "displayName": "MSVC Debug Characterization Tests",
       "inherits": "msvc-debug",

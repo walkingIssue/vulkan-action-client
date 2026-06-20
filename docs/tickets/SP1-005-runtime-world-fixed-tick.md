@@ -1,8 +1,8 @@
 # SP1-005: RuntimeWorld and Fixed Tick Runner
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-005-runtime-world-fixed-tick
-Start commit: pending
+Start commit: `e187cfb`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 4: Architectural Decisions
@@ -94,11 +94,19 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-004 AuthoringScene v0 was merged.
+- 2026-06-20: Added `simulation_core`, semantic input frames, fixed tick runner, deterministic state hash, render-cadence replay helper, and renderer-free presentation interpolation tests.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-simulation` passed: 1/1 test.
+- `ctest --preset msvc-debug-unit` passed: 8/8 tests.
+- `ctest --preset msvc-debug-content` passed: 1/1 test.
+- `ctest --preset msvc-debug-characterization` passed: 2/2 tests.
+- `ctest --preset msvc-debug` passed: 10/10 tests, including `network_e2e` and `viewer_smoke`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `7047932` Add SP1-005 fixed tick simulation runtime

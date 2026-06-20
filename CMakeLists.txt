@@ -58,6 +58,21 @@ target_link_libraries(scene_core PUBLIC
     spdlog::spdlog
 )
 
+add_library(simulation_core
+    src/simulation/runtime_world.cpp
+)
+
+target_compile_features(simulation_core PUBLIC cxx_std_20)
+
+target_include_directories(simulation_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(simulation_core PUBLIC
+    content_core
+    scene_core
+)
+
 add_library(input_core
     src/input/glfw_control_bindings.cpp
 )
@@ -221,6 +236,22 @@ if(BUILD_TESTING)
     set_tests_properties(authoring_scene_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;content;authoring;map"
+    )
+
+    add_executable(simulation_runtime_tests
+        tests/simulation_runtime_tests.cpp
+    )
+
+    target_compile_features(simulation_runtime_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(simulation_runtime_tests PRIVATE
+        simulation_core
+    )
+
+    add_test(NAME simulation_runtime_tests COMMAND simulation_runtime_tests)
+    set_tests_properties(simulation_runtime_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;simulation;runtime"
     )
 
     add_executable(movement_behavior_tests
