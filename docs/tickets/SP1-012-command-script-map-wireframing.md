@@ -1,6 +1,6 @@
 # SP1-012: Command-Script Map Wireframing
 
-Status: planned
+Status: complete
 Branch: sprint01/sp1-012-command-script-map-wireframing
 Start commit: d45f91d
 Source plan: `docs/sprint-01-implementation-plan.md`
@@ -92,11 +92,22 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-009 proxy animation was started in a parallel lane.
+- 2026-06-20: Added `map_command_core`, `map_command_runner`, deterministic command fixture, unit coverage, and a CTest process smoke.
+- 2026-06-20: Hardened save/reopen path handling so command scripts stay under the script/base artifact directory unless explicitly rooted.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug --target map_command_runner_tests map_command_runner` passed.
+- `ctest --test-dir build/msvc-debug -R "map_command_runner" --output-on-failure` passed: 2/2 tests.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-content --output-on-failure` passed: 4/4 tests.
+- `ctest --preset msvc-debug-simulation --output-on-failure` passed: 1/1 tests.
+- Initial `ctest --preset msvc-debug --output-on-failure` failed only because this isolated worktree did not contain ignored local extracted paladin assets required by existing characterization/viewer tests.
+- After copying the ignored local `assets/extracted` directory from the original checkout for verification, `ctest --preset msvc-debug --output-on-failure` passed: 16/16 tests.
+- `build/msvc-debug/test-artifacts/map_command_runner_result.json` reported `status: ok`, `commandCount: 17`, `entityCount: 2`, `colliderCount: 2`, `spawnPointCount: 2`, `ticks: 300`, and `stateHash: 10715893869485234459`.
 
 ## Final Commits
 
-Pending.
+- `e7252a6` Add SP1-012 map command runner
+- `a9da27e` Harden map command save paths

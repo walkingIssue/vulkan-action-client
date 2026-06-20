@@ -110,6 +110,22 @@ target_link_libraries(combat_runtime_core PUBLIC
     simulation_core
 )
 
+add_library(map_command_core
+    src/authoring/map_command_script.cpp
+)
+
+target_compile_features(map_command_core PUBLIC cxx_std_20)
+
+target_include_directories(map_command_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(map_command_core PUBLIC
+    content_core
+    simulation_core
+    nlohmann_json::nlohmann_json
+)
+
 add_library(input_core
     src/input/glfw_control_bindings.cpp
 )
@@ -213,6 +229,17 @@ target_compile_features(scene_probe PRIVATE cxx_std_20)
 
 target_link_libraries(scene_probe PRIVATE
     scene_core
+    host_core
+)
+
+add_executable(map_command_runner
+    src/map_command_runner.cpp
+)
+
+target_compile_features(map_command_runner PRIVATE cxx_std_20)
+
+target_link_libraries(map_command_runner PRIVATE
+    map_command_core
     host_core
 )
 
@@ -353,6 +380,34 @@ if(BUILD_TESTING)
     set_tests_properties(proxy_animation_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;animation;combat"
+    )
+
+    add_executable(map_command_runner_tests
+        tests/map_command_runner_tests.cpp
+    )
+
+    target_compile_features(map_command_runner_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(map_command_runner_tests PRIVATE
+        map_command_core
+    )
+
+    add_test(NAME map_command_runner_tests COMMAND map_command_runner_tests)
+    set_tests_properties(map_command_runner_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;content;authoring;map"
+    )
+
+    add_test(
+        NAME map_command_runner_process
+        COMMAND map_command_runner
+                --command-script "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/commands/wire_arena.commands.json"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/map_command_runner_result.json"
+                --headless
+    )
+    set_tests_properties(map_command_runner_process PROPERTIES
+        TIMEOUT 20
+        LABELS "content;authoring;map;process"
     )
 
     add_executable(movement_behavior_tests
