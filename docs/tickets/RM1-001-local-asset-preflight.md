@@ -1,6 +1,6 @@
 # RM1-001: Local Asset Preflight and Fixture Guidance
 
-Status: planned
+Status: complete
 Branch: mitigation01/rm1-001-local-asset-preflight
 Start commit: `48d2f74`
 Source plan: `docs/sprint-01-risk-mitigation-plan.md`
@@ -78,11 +78,19 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after Sprint 1 completed and `docs/sprint-01-risk-mitigation-plan.md` was pushed.
+- 2026-06-20: Added `asset_fixture_check`, CTest preflight coverage, missing-root negative coverage, and README guidance.
+- 2026-06-20: Rebasing onto `origin/main` at `cab1da0` preserved the RM1-001 implementation without conflicts.
 
 ## Verification Results
 
-Pending.
+- `cmake --build --preset msvc-debug --target asset_fixture_check` passed after rebase.
+- `ctest --test-dir build/msvc-debug -R "asset_fixture_check" --output-on-failure` passed: 2/2 tests.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-viewer --output-on-failure` passed: 4/4 tests.
+- `ctest --preset msvc-debug --output-on-failure` passed: 26/26 tests.
+- `build/msvc-debug/test-artifacts/asset_fixture_check_result.json` reported `status: ok`, `host: asset_fixture_check`, and present diagnostics for the OBJ, MTL, and texture directory.
+- `build/msvc-debug/test-artifacts/asset_fixture_check_missing_result.json` reported `status: error`, `host: asset_fixture_check`, missing diagnostics for the OBJ, MTL, and texture directory, and remediation guidance.
 
 ## Final Commits
 
-Pending.
+- `3f014d0` Add RM1-001 asset fixture preflight
