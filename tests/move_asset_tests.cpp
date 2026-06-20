@@ -133,12 +133,16 @@ void validLightAttackCompiles()
     expect(compiled.ok(), "valid light attack compiles");
     expect(compiled.move.logicalId == "move.light_attack", "compiled move logical id");
     expect(compiled.move.durationTicks == 34, "compiled move duration");
-    expect(compiled.move.moveId == 2, "compiled move id is interned from sorted move IDs");
-    expect(compiled.move.internTable.moveIds.size() == 3, "compiled move id table size");
+    expect(compiled.move.moveId == 3, "compiled move id is interned from sorted move IDs");
+    expect(compiled.move.internTable.moveIds.size() == 4, "compiled move id table size");
     expect(compiled.move.internTable.trackIds.size() == 3, "compiled track id table size");
     expect(compiled.move.internTable.eventIds.size() == 2, "compiled event id table size");
     expect(compiled.move.phases.size() == 3, "compiled phase count");
     expect(compiled.move.hitboxTracks.size() == 1, "compiled hitbox count");
+    expect(compiled.move.hitboxTracks.front().damage == 12, "compiled hitbox damage effect");
+    expect(compiled.move.hitboxTracks.front().reactionMove == "move.hit_reaction", "compiled hitbox reaction effect");
+    expect(compiled.move.hitboxTracks.front().hitstopTicks == 1, "compiled hitbox hitstop effect");
+    expect(compiled.move.hitboxTracks.front().stunTicks == 3, "compiled hitbox stun effect");
     expect(compiled.move.cancels.size() == 2, "compiled cancel count");
 
     const std::string canonical = vac::content::toCanonicalJsonString(asset);

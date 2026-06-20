@@ -50,6 +50,10 @@ struct HitboxTrack
     glm::vec3 size{1.0f};
     glm::vec3 offset{0.0f};
     std::vector<std::string> tags;
+    uint32_t damage = 0;
+    uint16_t hitstopTicks = 0;
+    uint16_t stunTicks = 0;
+    std::string reactionMove;
 };
 
 struct HurtboxOverride
@@ -140,6 +144,10 @@ struct CompiledHitboxTrack
     glm::vec3 size{1.0f};
     glm::vec3 offset{0.0f};
     std::vector<uint32_t> tagIds;
+    uint32_t damage = 0;
+    uint16_t hitstopTicks = 0;
+    uint16_t stunTicks = 0;
+    std::string reactionMove;
 };
 
 struct CompiledHurtboxOverride

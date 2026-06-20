@@ -4,7 +4,7 @@
   "logicalId": "move.light_attack",
   "durationTicks": 34,
   "tags": ["startup", "active", "recovery", "attack", "light", "weapon", "vulnerable", "chain"],
-  "knownMoves": ["move.light_attack", "move.light_followup", "move.dodge"],
+  "knownMoves": ["move.light_attack", "move.light_followup", "move.dodge", "move.hit_reaction"],
   "input": {
     "command": "light_attack",
     "bufferTicks": 8
@@ -32,7 +32,13 @@
       "socket": "weapon_tip",
       "size": [0.6, 0.45, 1.4],
       "offset": [0.0, 1.1, 0.4],
-      "tags": ["weapon", "light"]
+      "tags": ["weapon", "light"],
+      "effect": {
+        "damage": 12,
+        "hitstopTicks": 1,
+        "stunTicks": 3,
+        "reactionMove": "move.hit_reaction"
+      }
     }
   ],
   "hurtboxOverrides": [

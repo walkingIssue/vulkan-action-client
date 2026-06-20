@@ -101,12 +101,12 @@ void scenarioLabBuildsScenarioDiagnostics()
     expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioGoldenMatched=true") !=
                scene.resultDiagnostics.end(),
            "scenario diagnostics include golden matched");
-    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioTraceEventCount=8") !=
+    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioTraceEventCount=13") !=
                scene.resultDiagnostics.end(),
            "scenario diagnostics include trace event count");
     expect(std::find(scene.resultDiagnostics.begin(),
                      scene.resultDiagnostics.end(),
-                     "scenarioFinalStateHash=0x899156866903d60e") != scene.resultDiagnostics.end(),
+                     "scenarioFinalStateHash=0xf73237aa3baea830") != scene.resultDiagnostics.end(),
            "scenario diagnostics include final state hash");
 }
 } // namespace

@@ -60,6 +60,18 @@ void expectDiagnostic(const vac::combat::ScenarioRunResult &result, std::string_
            "diagnostic " + std::string{code} + " at " + std::string{fieldPath});
 }
 
+std::vector<const vac::combat::ScenarioTraceEvent *> eventsOfKind(const vac::combat::ScenarioRunResult &result,
+                                                                  std::string_view kind)
+{
+    std::vector<const vac::combat::ScenarioTraceEvent *> events;
+    for (const vac::combat::ScenarioTraceEvent &event : result.trace.events) {
+        if (event.kind == kind) {
+            events.push_back(&event);
+        }
+    }
+    return events;
+}
+
 std::filesystem::path writeMoveWithHitboxSocket(std::string_view socketName)
 {
     const std::filesystem::path source = projectRoot() / "content/moves/light_attack.move.json";
@@ -191,6 +203,45 @@ void hitboxSocketMustExistInBoundProxyAnimation()
     expectDiagnostic(result, "missing_hitbox_socket", "moves/move.light_attack/hitboxTracks/blade_arc/socket");
     expect(result.trace.events.empty(), "missing hitbox socket exits before simulation");
 }
+
+void hitTraceIncludesDamageAndReactionFields()
+{
+    const vac::combat::ScenarioRunResult result = runScenario("sword_light_hits_idle_target.scenario.json");
+    const std::vector<const vac::combat::ScenarioTraceEvent *> hitEvents = eventsOfKind(result, "hit");
+    expect(hitEvents.size() == 1, "single hit event emitted");
+    if (hitEvents.empty()) {
+        return;
+    }
+
+    const vac::combat::ScenarioTraceEvent &hit = *hitEvents.front();
+    expect(hit.hasEffect, "hit event carries effect fields");
+    expect(hit.damage == 12, "hit event records damage");
+    expect(hit.targetRemainingHealth == 88, "hit event records remaining health");
+    expect(hit.reactionMove == "move.hit_reaction", "hit event records reaction move");
+    expect(hit.hitstopTicks == 1, "hit event records hitstop");
+    expect(hit.stunTicks == 3, "hit event records stun");
+}
+
+void blockedHitTraceShowsNoDamage()
+{
+    const vac::combat::ScenarioRunResult result = runScenario("dodge_invulnerability_boundary.scenario.json");
+    const std::vector<const vac::combat::ScenarioTraceEvent *> blockedEvents = eventsOfKind(result, "hit_blocked");
+    expect(!blockedEvents.empty(), "blocked hit events emitted");
+    if (!blockedEvents.empty()) {
+        const vac::combat::ScenarioTraceEvent &blocked = *blockedEvents.front();
+        expect(blocked.hasEffect, "blocked hit carries no-damage effect fields");
+        expect(blocked.damage == 0, "blocked hit records zero damage");
+        expect(blocked.targetRemainingHealth == 100, "blocked hit preserves health");
+        expect(blocked.reactionMove.empty(), "blocked hit does not start reaction");
+    }
+
+    const std::vector<const vac::combat::ScenarioTraceEvent *> hitEvents = eventsOfKind(result, "hit");
+    expect(hitEvents.size() == 1, "post-invulnerability hit applies exactly once");
+    if (!hitEvents.empty()) {
+        expect(hitEvents.front()->damage == 12, "post-invulnerability hit applies damage");
+        expect(hitEvents.front()->targetRemainingHealth == 88, "post-invulnerability hit leaves expected health");
+    }
+}
 } // namespace
 
 int main()
@@ -204,6 +255,8 @@ int main()
         unknownAnimationBindingReportsMoveDiagnostic();
         hitboxMoveRequiresProxyAnimationBinding();
         hitboxSocketMustExistInBoundProxyAnimation();
+        hitTraceIncludesDamageAndReactionFields();
+        blockedHitTraceShowsNoDamage();
     } catch (const std::exception &error) {
         ++g_failures;
         std::cerr << "FAIL: unexpected exception: " << error.what() << '\n';

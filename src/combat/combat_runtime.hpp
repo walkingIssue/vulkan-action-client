@@ -54,6 +54,8 @@ struct CombatActorState
     uint32_t activeMoveId = 0;
     uint32_t moveInstanceSequence = 0;
     uint16_t moveTick = 0;
+    uint32_t maxHealth = 0;
+    uint32_t currentHealth = 0;
     std::vector<uint32_t> stateTags;
     uint16_t hitstopRemaining = 0;
     uint16_t stunRemaining = 0;
@@ -104,12 +106,25 @@ struct CombatTickResult
     std::vector<CombatEvent> events;
 };
 
+struct CombatHitEffectResult
+{
+    uint32_t damageApplied = 0;
+    uint32_t remainingHealth = 0;
+    uint16_t hitstopTicks = 0;
+    uint16_t stunTicks = 0;
+    bool reactionStarted = false;
+    std::string reactionMove;
+};
+
 CombatRuntime createCombatRuntime(const CombatMoveLibrary &moveLibrary,
                                   const std::vector<simulation::RuntimeActor> &actors);
 CombatActorState *findCombatActor(CombatRuntime &runtime, simulation::RuntimeActorId actorId);
 const CombatActorState *findCombatActor(const CombatRuntime &runtime, simulation::RuntimeActorId actorId);
 CombatTickResult advanceCombatTick(CombatRuntime &runtime, const std::vector<simulation::InputFrame> &inputs,
                                    const std::vector<CombatTickContext> &contexts = {});
+void setActorHealth(CombatActorState &actor, uint32_t currentHealth, uint32_t maxHealth);
+CombatHitEffectResult applyHitEffect(CombatRuntime &runtime, CombatActorState &victim,
+                                     const content::CompiledHitboxTrack &hitbox);
 void applyHitstop(CombatActorState &actor, uint16_t ticks);
 void applyStun(CombatActorState &actor, uint16_t ticks);
 } // namespace vac::combat
