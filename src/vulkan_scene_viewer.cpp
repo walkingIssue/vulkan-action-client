@@ -395,7 +395,6 @@ private:
         m_fixedAccumulatorSeconds += std::min(deltaSeconds, 0.25f);
 
         const vac::combat::LocalMoveIntent playerIntent = readPlayerMoveAxes();
-        const bool playerCameraLocked = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
         float sparringYawDegrees = 0.0f;
         if (m_sparringIndex.has_value()) {
             sparringYawDegrees = m_actorStates[*m_sparringIndex].currentTransform.rotationDegrees.y;
@@ -413,19 +412,11 @@ private:
             }
 
             if (m_playerIndex.has_value()) {
-                if (playerCameraLocked) {
-                    moved |= vac::combat::applyCameraLockedLocomotion(m_actorStates[*m_playerIndex],
-                                                                      playerIntent,
-                                                                      {m_cameraYawDegrees},
-                                                                      vac::combat::kFixedTickSeconds,
-                                                                      arena);
-                } else {
-                    moved |= vac::combat::applyCharacterLocomotion(m_actorStates[*m_playerIndex],
-                                                                   playerIntent,
-                                                                   {m_cameraYawDegrees},
-                                                                   vac::combat::kFixedTickSeconds,
-                                                                   arena);
-                }
+                moved |= vac::combat::applyCameraLockedLocomotion(m_actorStates[*m_playerIndex],
+                                                                  playerIntent,
+                                                                  {m_cameraYawDegrees},
+                                                                  vac::combat::kFixedTickSeconds,
+                                                                  arena);
             }
 
             if (m_sparringIndex.has_value()) {
