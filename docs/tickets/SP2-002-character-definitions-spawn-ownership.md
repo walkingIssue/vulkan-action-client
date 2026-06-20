@@ -104,4 +104,4 @@ Ownership boundaries:
 
 ## Final Commits
 
-Pending final branch commit.
+- `4f318a1 Add SP2-002 character definitions`

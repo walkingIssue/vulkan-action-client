@@ -3,7 +3,7 @@
 Status: ready for merge
 Branch: `sprint02/sp2-002-character-definitions-spawn-ownership`
 Start commit: `dc260f0`
-Implementation commits: pending final branch commit
+Implementation commits: `4f318a1`
 
 ## What Changed
 
