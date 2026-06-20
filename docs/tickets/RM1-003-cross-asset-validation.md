@@ -87,6 +87,7 @@ Ownership boundaries:
 
 - 2026-06-20: Started after Sprint 1 completed and `docs/sprint-01-risk-mitigation-plan.md` was pushed.
 - 2026-06-20: Added scenario content graph validation, path diagnostics, move-animation binding checks, hitbox socket checks, and focused regression coverage.
+- 2026-06-20: Rebased after RM1-001 landed on `main` and refreshed focused/full verification.
 
 ## Verification Results
 
@@ -96,14 +97,15 @@ Ownership boundaries:
 - `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target visual_lab_tests` passed after the broader combat preset found that binary missing in this checkout's build tree.
 - `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13 tests.
 - `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` passed with the existing `Xinput.lib` imported `DllMain` linker warning.
-- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 24/24 tests.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 26/26 tests after RM1-001 added the asset preflight CTest entries.
 - MSVC runtime/assertion dialog check found no matching visible dialogs.
 
 Notes:
 
 - A raw build command outside `tools/dev-shell.ps1` failed before project compilation because Clang could not find MSVC standard library headers such as `<cstdint>` and `<string>`. Verification was rerun through `tools/dev-shell.ps1`, which sets the required MSVC/Ninja/Vulkan/vcpkg environment.
 - An early focused CTest run failed process tests because `combat_scenario_runner.exe` was stale; rebuilding the runner fixed the process tests.
+- The first full CTest run after the RM1-001 rebase found `asset_fixture_check.exe` missing in this checkout's build tree; running the full debug build produced the new target, and the rerun passed 26/26.
 
 ## Final Commits
 
-- `6ebec8d` Add scenario content graph validation
+- See `merge-log.md` for the final rebased branch head; the feature branch was rebased after RM1-001 landed on `main`.

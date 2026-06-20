@@ -3,7 +3,7 @@
 Status: complete
 Branch: `mitigation01/rm1-003-cross-asset-validation`
 Start commit: `1eeb5b4`
-Implementation commit: `6ebec8d`
+Implementation commit: see the final rebased branch head in `merge-log.md`.
 
 ## What Changed
 
@@ -28,8 +28,10 @@ Implementation commit: `6ebec8d`
 - `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "combat_scenario" --output-on-failure` passed: 6/6 tests.
 - `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13 tests.
 - `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` passed with the existing `Xinput.lib` imported `DllMain` linker warning.
-- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 24/24 tests.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 26/26 tests after RM1-001 landed and added asset preflight checks.
 - MSVC runtime/assertion dialog check found no matching visible dialogs.
+
+Post-RM1-001 rebase note: the first full CTest run in this checkout found the newly registered `asset_fixture_check.exe` target missing from the build tree. Running `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` produced it, and the full CTest rerun passed 26/26.
 
 ## Residual Risks
 
@@ -39,4 +41,4 @@ Implementation commit: `6ebec8d`
 
 ## Next Recommended Ticket
 
-Continue the mitigation minisprint with RM1-001/RM1-002 coordination. RM1-004 should consume this validation path when scenario-driven visual lab diagnostics are dispatched.
+Continue the mitigation minisprint with RM1-002 coordination. RM1-004 should consume this validation path when scenario-driven visual lab diagnostics are dispatched.
