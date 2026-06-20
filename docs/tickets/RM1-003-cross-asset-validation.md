@@ -1,6 +1,6 @@
 # RM1-003: Cross-Asset Content Validation
 
-Status: planned
+Status: complete
 Branch: mitigation01/rm1-003-cross-asset-validation
 Start commit: `1eeb5b4`
 Source plan: docs/sprint-01-risk-mitigation-plan.md
@@ -86,11 +86,24 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after Sprint 1 completed and `docs/sprint-01-risk-mitigation-plan.md` was pushed.
+- 2026-06-20: Added scenario content graph validation, path diagnostics, move-animation binding checks, hitbox socket checks, and focused regression coverage.
 
 ## Verification Results
 
-Pending.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target combat_scenario_tests` passed.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target combat_scenario_runner` passed with the pre-existing `std::getenv` deprecation warning.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "combat_scenario" --output-on-failure` passed: 6/6 tests.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target visual_lab_tests` passed after the broader combat preset found that binary missing in this checkout's build tree.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13 tests.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` passed with the existing `Xinput.lib` imported `DllMain` linker warning.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 24/24 tests.
+- MSVC runtime/assertion dialog check found no matching visible dialogs.
+
+Notes:
+
+- A raw build command outside `tools/dev-shell.ps1` failed before project compilation because Clang could not find MSVC standard library headers such as `<cstdint>` and `<string>`. Verification was rerun through `tools/dev-shell.ps1`, which sets the required MSVC/Ninja/Vulkan/vcpkg environment.
+- An early focused CTest run failed process tests because `combat_scenario_runner.exe` was stale; rebuilding the runner fixed the process tests.
 
 ## Final Commits
 
-Pending.
+- `6ebec8d` Add scenario content graph validation
