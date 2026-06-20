@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: sprint01/sp1-010-scenario-runner-goldens
-Start commit: `de9caae`
+Start commit: `8309d55`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 13.13: Combat regression tests
