@@ -1,9 +1,9 @@
 # RM1-002 Result: Compiled Network E2E Runner
 
-Status: implemented, merge pending
+Status: ready for merge
 Branch: `mitigation01/rm1-002-compiled-network-e2e`
 Start commit: `9f06853`
-Implementation commit: `fa5c624`
+Implementation commit after RM1-003 rebase: `d6d2a20`
 
 ## What Changed
 
@@ -48,11 +48,12 @@ The exact per-client remote snapshot counts can vary slightly with loopback timi
 
 ## Verification
 
-- `cmake --build --preset msvc-debug --target network_e2e_runner` passed.
+- Rebased cleanly onto `a8b932d Merge RM1-003 cross-asset validation`.
+- `cmake --build --preset msvc-debug --target network_e2e_runner` passed after the rebase.
 - `ctest --test-dir build/msvc-debug -R "network_e2e" --output-on-failure` passed: 1/1.
 - `ctest --preset msvc-debug-network --output-on-failure` passed: 4/4.
 - `ctest --preset msvc-debug-e2e --output-on-failure` passed: 1/1.
-- `cmake --build --preset msvc-debug` passed: no work to do after focused build.
+- `cmake --build --preset msvc-debug` passed.
 - `ctest --preset msvc-debug --output-on-failure` passed: 26/26.
 - `network_e2e_runner --client-count 1 --result-file build/msvc-debug/test-artifacts/network_e2e_invalid_client_count.json --headless` returned exit 1 and wrote `process_error`.
 - `network_e2e_runner --unknown-option --result-file build/msvc-debug/test-artifacts/network_e2e_unknown_option.json --headless` returned exit 1 and wrote `process_error`.
@@ -67,4 +68,4 @@ The exact per-client remote snapshot counts can vary slightly with loopback timi
 
 ## Merge State
 
-Mia opened Vera's RM1-003 merge window while RM1-002 verification was underway. RM1-002 implementation is ready on its feature branch, but final merge/push to `main` is held until RM1-003 lands or Mia releases the merge queue.
+Vera's RM1-003 merge landed on `main` at `a8b932d`. RM1-002 has been rebased and reverified on top of that merge and is ready for a serialized merge request.

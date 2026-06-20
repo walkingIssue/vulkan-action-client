@@ -1,6 +1,6 @@
 # RM1-002: Compiled Network E2E Runner
 
-Status: implemented, merge pending
+Status: ready for merge
 Branch: mitigation01/rm1-002-compiled-network-e2e
 Start commit: `9f06853`
 Source plan: docs/sprint-01-risk-mitigation-plan.md
@@ -96,15 +96,16 @@ Ownership boundaries:
 
 - 2026-06-20: Started after RM1-001 merged and Mia released RM1-002.
 - 2026-06-20: Added compiled `network_e2e_runner`, replaced the canonical CTest command, and kept the old PowerShell script as an optional manual helper.
-- 2026-06-20: Focused, preset, full debug, negative CLI, and MSVC runtime-dialog checks passed. Final merge is waiting for Vera's RM1-003 merge window to close.
+- 2026-06-20: Focused, preset, full debug, negative CLI, and MSVC runtime-dialog checks passed. Final merge waited for Vera's RM1-003 merge window to close.
+- 2026-06-20: Rebasing onto `a8b932d Merge RM1-003 cross-asset validation` was clean; focused, network, e2e, full debug, and negative CLI checks passed again.
 
 ## Verification Results
 
-- `cmake --build --preset msvc-debug --target network_e2e_runner` passed.
+- After rebasing onto `a8b932d`, `cmake --build --preset msvc-debug --target network_e2e_runner` passed.
 - `ctest --test-dir build/msvc-debug -R "network_e2e" --output-on-failure` passed: 1/1.
 - `ctest --preset msvc-debug-network --output-on-failure` passed: 4/4.
 - `ctest --preset msvc-debug-e2e --output-on-failure` passed: 1/1.
-- `cmake --build --preset msvc-debug` passed: no work to do after the focused build.
+- `cmake --build --preset msvc-debug` passed.
 - `ctest --preset msvc-debug --output-on-failure` passed: 26/26.
 - `network_e2e_runner --client-count 1 --result-file ... --headless` returned exit 1 and wrote a structured `process_error` diagnostic.
 - `network_e2e_runner --unknown-option --result-file ... --headless` returned exit 1 and wrote a structured `process_error` diagnostic.
@@ -113,4 +114,4 @@ Ownership boundaries:
 
 ## Final Commits
 
-- `fa5c624` Add compiled network E2E runner
+- `d6d2a20` Add compiled network E2E runner
