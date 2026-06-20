@@ -112,6 +112,32 @@ bool applyFramedStrafeLocomotion(ActorState &actor,
     return true;
 }
 
+bool applyMoveToWorldTarget(ActorState &actor,
+                            glm::vec2 target,
+                            float deltaSeconds,
+                            ArenaLimits arena,
+                            float arrivalRadius)
+{
+    Transform &transform = actor.currentTransform;
+    const glm::vec2 current{transform.translation.x, transform.translation.z};
+    const glm::vec2 toTarget = target - current;
+    const float distance = std::sqrt(glm::dot(toTarget, toTarget));
+    if (distance <= arrivalRadius) {
+        return false;
+    }
+
+    const glm::vec2 direction = toTarget / distance;
+    const float yawDegrees = glm::degrees(std::atan2(direction.x, direction.y));
+    const bool rotated = std::abs(transform.rotationDegrees.y - yawDegrees) > 0.001f;
+    transform.rotationDegrees.y = yawDegrees;
+
+    const float step = std::min(actor.moveSpeedWorldUnitsPerSecond * deltaSeconds, distance);
+    transform.translation.x += direction.x * step;
+    transform.translation.z += direction.y * step;
+    clampToArena(transform, arena);
+    return rotated || step > 0.0f;
+}
+
 Transform interpolate(const ActorState &actor, float alpha)
 {
     const float clampedAlpha = std::clamp(alpha, 0.0f, 1.0f);

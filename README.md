@@ -69,12 +69,13 @@ The viewer keeps running until the window is closed. Press Escape to close it fr
 Prototype controls:
 
 - `WASD` or XInput left stick moves the player.
-- Mouse rotates the player-follow camera without changing player facing.
-- Hold right mouse button to lock player facing and movement to the camera direction.
+- Tab or Caps Lock toggles between cursor mode and camera steering mode.
+- In cursor mode, the mouse pointer is visible. Left click the projected ground square to rotate the player toward that point and move there.
+- In camera steering mode, mouse movement rotates the player-follow camera and player movement/facing locks to the camera direction.
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. With free-look, player movement strafes relative to the character's current facing. With right mouse button held, movement becomes camera-relative and facing locks to the camera. Backpedal moves at one-third forward speed.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Cursor mode uses character-facing movement and click-to-move world targets. Camera steering mode uses camera-relative movement and facing. Diagonal movement input is normalized so `A+W` and `D+W` do not move faster than straight movement. Backpedal moves at one-third forward speed.
 
 ## Architecture Notes
 

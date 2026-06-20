@@ -106,6 +106,13 @@ struct PushConstants
     glm::vec4 color{1.0f};
 };
 
+struct CameraView
+{
+    glm::vec3 eye{0.0f};
+    glm::vec3 target{0.0f};
+    float worldRadius = 32.0f;
+};
+
 std::vector<char> readFile(const std::filesystem::path &path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -231,9 +238,15 @@ private:
     uint32_t m_fpsFrames = 0;
     float m_cameraYawDegrees = 180.0f;
     float m_cameraPitchDegrees = 24.0f;
+    bool m_cameraSteeringEnabled = false;
+    bool m_cameraToggleWasDown = false;
     bool m_mouseLookInitialized = false;
     double m_lastMouseX = 0.0;
     double m_lastMouseY = 0.0;
+    bool m_leftMouseWasDown = false;
+    std::optional<glm::vec2> m_playerMoveTarget;
+    std::optional<glm::vec3> m_groundCursorPoint;
+    std::vector<vac::SceneVertex> m_cursorLineVertices;
     std::optional<size_t> m_playerIndex;
     std::optional<size_t> m_sparringIndex;
     bool m_lineGeometryDirty = false;
@@ -278,10 +291,20 @@ private:
         glfwSetWindowUserPointer(m_window, this);
         glfwSetFramebufferSizeCallback(m_window, framebufferResizeCallback);
         glfwSetCursorPosCallback(m_window, cursorPositionCallback);
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        applyCursorMode();
+    }
+
+    void applyCursorMode()
+    {
+        glfwSetInputMode(m_window,
+                         GLFW_CURSOR,
+                         m_cameraSteeringEnabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
         if (glfwRawMouseMotionSupported() == GLFW_TRUE) {
-            glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+            glfwSetInputMode(m_window,
+                             GLFW_RAW_MOUSE_MOTION,
+                             m_cameraSteeringEnabled ? GLFW_TRUE : GLFW_FALSE);
         }
+        m_mouseLookInitialized = false;
     }
 
     void initVulkan()
@@ -311,6 +334,9 @@ private:
 
         while (!glfwWindowShouldClose(m_window)) {
             glfwPollEvents();
+            handleCameraModeToggle();
+            updateGroundCursor();
+            handleClickToMoveInput();
             if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
                 glfwSetWindowShouldClose(m_window, GLFW_TRUE);
             }
@@ -365,9 +391,33 @@ private:
         }
     }
 
+    void handleCameraModeToggle()
+    {
+        const bool toggleKeyDown = glfwGetKey(m_window, GLFW_KEY_TAB) == GLFW_PRESS ||
+                                   glfwGetKey(m_window, GLFW_KEY_CAPS_LOCK) == GLFW_PRESS;
+        if (toggleKeyDown && !m_cameraToggleWasDown) {
+            setCameraSteeringEnabled(!m_cameraSteeringEnabled);
+        }
+        m_cameraToggleWasDown = toggleKeyDown;
+    }
+
+    void setCameraSteeringEnabled(bool enabled)
+    {
+        if (m_cameraSteeringEnabled == enabled) {
+            return;
+        }
+
+        m_cameraSteeringEnabled = enabled;
+        if (m_cameraSteeringEnabled) {
+            m_playerMoveTarget.reset();
+        }
+        applyCursorMode();
+        updateGroundCursor();
+    }
+
     void handleMouseLook(double x, double y)
     {
-        if (m_options.orbitCamera) {
+        if (m_options.orbitCamera || !m_cameraSteeringEnabled) {
             return;
         }
 
@@ -390,12 +440,123 @@ private:
                                           58.0f);
     }
 
+    void handleClickToMoveInput()
+    {
+        const bool leftMouseDown = glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        if (!m_cameraSteeringEnabled && leftMouseDown && !m_leftMouseWasDown && m_groundCursorPoint.has_value()) {
+            m_playerMoveTarget = glm::vec2{m_groundCursorPoint->x, m_groundCursorPoint->z};
+            rebuildCursorLineVertices();
+        }
+        m_leftMouseWasDown = leftMouseDown;
+    }
+
+    void updateGroundCursor()
+    {
+        if (m_cameraSteeringEnabled) {
+            const bool hadCursorLines = !m_cursorLineVertices.empty() || m_groundCursorPoint.has_value();
+            m_groundCursorPoint.reset();
+            m_cursorLineVertices.clear();
+            if (hadCursorLines) {
+                m_lineGeometryDirty = true;
+            }
+            return;
+        }
+
+        m_groundCursorPoint = groundPointUnderCursor();
+        rebuildCursorLineVertices();
+    }
+
+    std::optional<glm::vec3> groundPointUnderCursor() const
+    {
+        if (m_swapChainExtent.width == 0 || m_swapChainExtent.height == 0) {
+            return std::nullopt;
+        }
+
+        double cursorX = 0.0;
+        double cursorY = 0.0;
+        glfwGetCursorPos(m_window, &cursorX, &cursorY);
+
+        const float width = static_cast<float>(m_swapChainExtent.width);
+        const float height = static_cast<float>(m_swapChainExtent.height);
+        const float ndcX = static_cast<float>((cursorX / width) * 2.0 - 1.0);
+        const float ndcY = static_cast<float>(1.0 - (cursorY / height) * 2.0);
+
+        const CameraView camera = cameraView();
+        const glm::vec3 viewForward = glm::normalize(camera.target - camera.eye);
+        const glm::vec3 viewRight = glm::normalize(glm::cross(viewForward, glm::vec3{0.0f, 1.0f, 0.0f}));
+        const glm::vec3 viewUp = glm::normalize(glm::cross(viewRight, viewForward));
+        const float verticalScale = std::tan(glm::radians(50.0f) * 0.5f);
+        const float aspect = width / height;
+        const glm::vec3 rayDirection = glm::normalize(viewForward +
+                                                      viewRight * ndcX * verticalScale * aspect +
+                                                      viewUp * ndcY * verticalScale);
+
+        constexpr float groundY = 0.04f;
+        if (std::abs(rayDirection.y) < 0.0001f) {
+            return std::nullopt;
+        }
+
+        const float distance = (groundY - camera.eye.y) / rayDirection.y;
+        if (distance <= 0.0f) {
+            return std::nullopt;
+        }
+
+        glm::vec3 point = camera.eye + rayDirection * distance;
+        const vac::combat::ArenaLimits arena = arenaLimits();
+        const glm::vec2 allowed = glm::max(arena.halfExtents - glm::vec2{arena.edgeInset}, glm::vec2{0.0f});
+        point.x = std::clamp(point.x, -allowed.x, allowed.x);
+        point.y = groundY;
+        point.z = std::clamp(point.z, -allowed.y, allowed.y);
+        return point;
+    }
+
+    void rebuildCursorLineVertices()
+    {
+        m_cursorLineVertices.clear();
+        if (m_groundCursorPoint.has_value()) {
+            appendGroundSquare(m_cursorLineVertices, *m_groundCursorPoint, 1.4f, {0.28f, 0.88f, 1.0f});
+        }
+        if (m_playerMoveTarget.has_value()) {
+            appendGroundSquare(m_cursorLineVertices,
+                               {m_playerMoveTarget->x, 0.06f, m_playerMoveTarget->y},
+                               2.0f,
+                               {1.0f, 0.82f, 0.24f});
+        }
+        m_lineGeometryDirty = true;
+    }
+
+    static void appendGroundSquare(std::vector<vac::SceneVertex> &vertices,
+                                   glm::vec3 center,
+                                   float halfSize,
+                                   glm::vec3 color)
+    {
+        const glm::vec3 a{center.x - halfSize, center.y, center.z - halfSize};
+        const glm::vec3 b{center.x + halfSize, center.y, center.z - halfSize};
+        const glm::vec3 c{center.x + halfSize, center.y, center.z + halfSize};
+        const glm::vec3 d{center.x - halfSize, center.y, center.z + halfSize};
+        appendLine(vertices, a, b, color);
+        appendLine(vertices, b, c, color);
+        appendLine(vertices, c, d, color);
+        appendLine(vertices, d, a, color);
+    }
+
+    static void appendLine(std::vector<vac::SceneVertex> &vertices, glm::vec3 a, glm::vec3 b, glm::vec3 color)
+    {
+        vertices.push_back({a, {0.0f, 1.0f, 0.0f}, color});
+        vertices.push_back({b, {0.0f, 1.0f, 0.0f}, color});
+    }
+
     void updateSimulation(float deltaSeconds)
     {
         m_fixedAccumulatorSeconds += std::min(deltaSeconds, 0.25f);
 
         const vac::combat::LocalMoveIntent playerIntent = readPlayerMoveAxes();
         const bool lockPlayerFacingToCamera = shouldLockPlayerFacingToCamera();
+        const bool hasPlayerMoveInput = glm::dot(playerIntent.axes, playerIntent.axes) > 0.0001f;
+        if (hasPlayerMoveInput && m_playerMoveTarget.has_value()) {
+            m_playerMoveTarget.reset();
+            rebuildCursorLineVertices();
+        }
         float sparringYawDegrees = 0.0f;
         if (m_sparringIndex.has_value()) {
             sparringYawDegrees = m_actorStates[*m_sparringIndex].currentTransform.rotationDegrees.y;
@@ -414,18 +575,29 @@ private:
 
             if (m_playerIndex.has_value()) {
                 vac::combat::ActorState &player = m_actorStates[*m_playerIndex];
-                vac::combat::LocalMoveIntent tickIntent = playerIntent;
-                tickIntent.axes.x *= -1.0f;
-                const float movementYawDegrees = lockPlayerFacingToCamera
-                    ? m_cameraYawDegrees
-                    : player.currentTransform.rotationDegrees.y;
+                if (!lockPlayerFacingToCamera && !hasPlayerMoveInput && m_playerMoveTarget.has_value()) {
+                    moved |= vac::combat::applyMoveToWorldTarget(player,
+                                                                 *m_playerMoveTarget,
+                                                                 vac::combat::kFixedTickSeconds,
+                                                                 arena);
+                    if (isAtMoveTarget(player, *m_playerMoveTarget)) {
+                        m_playerMoveTarget.reset();
+                        rebuildCursorLineVertices();
+                    }
+                } else {
+                    vac::combat::LocalMoveIntent tickIntent = playerIntent;
+                    tickIntent.axes.x *= -1.0f;
+                    const float movementYawDegrees = lockPlayerFacingToCamera
+                        ? m_cameraYawDegrees
+                        : player.currentTransform.rotationDegrees.y;
 
-                moved |= vac::combat::applyFramedStrafeLocomotion(player,
-                                                                  tickIntent,
-                                                                  {movementYawDegrees},
-                                                                  lockPlayerFacingToCamera,
-                                                                  vac::combat::kFixedTickSeconds,
-                                                                  arena);
+                    moved |= vac::combat::applyFramedStrafeLocomotion(player,
+                                                                      tickIntent,
+                                                                      {movementYawDegrees},
+                                                                      lockPlayerFacingToCamera,
+                                                                      vac::combat::kFixedTickSeconds,
+                                                                      arena);
+                }
             }
 
             if (m_sparringIndex.has_value()) {
@@ -488,7 +660,15 @@ private:
 
     bool shouldLockPlayerFacingToCamera() const
     {
-        return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        return m_cameraSteeringEnabled;
+    }
+
+    static bool isAtMoveTarget(const vac::combat::ActorState &actor, glm::vec2 target)
+    {
+        const glm::vec2 current{actor.currentTransform.translation.x, actor.currentTransform.translation.z};
+        const glm::vec2 delta = target - current;
+        const float radius = vac::combat::kMoveTargetArrivalRadiusWorldUnits;
+        return glm::dot(delta, delta) <= radius * radius;
     }
 
     vac::combat::LocalMoveIntent readPlayerMoveAxes() const
@@ -568,8 +748,9 @@ private:
             playerPosition = presentationTransform(*m_playerIndex).translation;
         }
 
-        const std::string title = fmt::format("Vulkan Action Client - {:.0f} FPS | player x={:.1f} z={:.1f}",
+        const std::string title = fmt::format("Vulkan Action Client - {:.0f} FPS | mode={} | player x={:.1f} z={:.1f}",
                                              fps,
+                                             m_cameraSteeringEnabled ? "camera" : "cursor",
                                              playerPosition.x,
                                              playerPosition.z);
         glfwSetWindowTitle(m_window, title.c_str());
@@ -1293,9 +1474,12 @@ private:
     std::vector<vac::SceneVertex> combinedLineVertices() const
     {
         std::vector<vac::SceneVertex> vertices;
-        vertices.reserve(m_renderData.staticLineVertices.size() + m_lineData.lineVertices.size());
+        vertices.reserve(m_renderData.staticLineVertices.size() +
+                         m_lineData.lineVertices.size() +
+                         m_cursorLineVertices.size());
         vertices.insert(vertices.end(), m_renderData.staticLineVertices.begin(), m_renderData.staticLineVertices.end());
         vertices.insert(vertices.end(), m_lineData.lineVertices.begin(), m_lineData.lineVertices.end());
+        vertices.insert(vertices.end(), m_cursorLineVertices.begin(), m_cursorLineVertices.end());
         return vertices;
     }
 
@@ -1353,9 +1537,10 @@ private:
         }
     }
 
-    glm::mat4 viewProjection() const
+    CameraView cameraView() const
     {
-        const float worldRadius = m_scene.worldBounds.valid
+        CameraView camera;
+        camera.worldRadius = m_scene.worldBounds.valid
             ? std::max({m_scene.worldBounds.max.x - m_scene.worldBounds.min.x,
                         m_scene.worldBounds.max.y - m_scene.worldBounds.min.y,
                         m_scene.worldBounds.max.z - m_scene.worldBounds.min.z,
@@ -1383,14 +1568,19 @@ private:
             cameraOffset = glm::vec3{orbit * glm::vec4{cameraOffset, 0.0f}};
         }
 
-        const glm::vec3 eye = anchor + cameraOffset;
-        const glm::vec3 target = anchor + forward * 10.0f + glm::vec3{0.0f, 2.0f, 0.0f};
+        camera.eye = anchor + cameraOffset;
+        camera.target = anchor + forward * 10.0f + glm::vec3{0.0f, 2.0f, 0.0f};
+        return camera;
+    }
 
-        glm::mat4 view = glm::lookAt(eye, target, glm::vec3{0.0f, 1.0f, 0.0f});
+    glm::mat4 viewProjection() const
+    {
+        const CameraView camera = cameraView();
+        glm::mat4 view = glm::lookAt(camera.eye, camera.target, glm::vec3{0.0f, 1.0f, 0.0f});
         glm::mat4 projection = glm::perspective(glm::radians(50.0f),
                                                 static_cast<float>(m_swapChainExtent.width) / static_cast<float>(m_swapChainExtent.height),
                                                 0.1f,
-                                                std::max(100.0f, worldRadius * 6.0f));
+                                                std::max(100.0f, camera.worldRadius * 6.0f));
         projection[1][1] *= -1.0f;
         return projection * view;
     }

@@ -10,6 +10,7 @@ inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
 inline constexpr int kMaxCatchUpTicksPerFrame = 5;
 inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
 inline constexpr float kBackpedalSpeedScale = 1.0f / 3.0f;
+inline constexpr float kMoveTargetArrivalRadiusWorldUnits = 1.0f;
 inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;
 inline constexpr float kTurnSpeedDegreesPerSecond = 240.0f;
 inline constexpr float kArenaEdgeInsetWorldUnits = 5.0f;
@@ -49,5 +50,10 @@ bool applyFramedStrafeLocomotion(ActorState &actor,
                                  bool lockFacingToMovementFrame,
                                  float deltaSeconds,
                                  ArenaLimits arena);
+bool applyMoveToWorldTarget(ActorState &actor,
+                            glm::vec2 target,
+                            float deltaSeconds,
+                            ArenaLimits arena,
+                            float arrivalRadius = kMoveTargetArrivalRadiusWorldUnits);
 Transform interpolate(const ActorState &actor, float alpha);
 } // namespace vac::combat
