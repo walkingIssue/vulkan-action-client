@@ -1,6 +1,6 @@
 # SP2-001: Combat Effects and Damage/Reactions v1
 
-Status: active
+Status: ready for merge
 Branch: sprint02/sp2-001-combat-effects-damage-reactions
 Start commit: `44c0422`
 Source plan: `docs/sprint-02-implementation-plan.md`
@@ -97,11 +97,23 @@ Ownership boundaries:
 
 - 2026-06-20: Planned by `SP2-PLAN`. Implementation not yet dispatched.
 - 2026-06-20: Vera dispatched by Mia for SP2-001 from `origin/main` `8f816f3`; start-doc refresh committed before code edits on branch `sprint02/sp2-001-combat-effects-damage-reactions`.
+- 2026-06-20: Added authored light-attack damage/effect data, provisional scenario combat bridge health, runtime hit effect application, trace effect fields, and final hash coverage for health/timing state.
+- 2026-06-20: Updated checked-in scenario goldens for hit, whiff, cancel-on-hit, and dodge/invulnerability paths. Visual lab scenario smoke expectations were updated because the scenario trace count and final hash intentionally changed.
 
 ## Verification Results
 
-Fill this before merging.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target combat_runtime_tests combat_scenario_tests move_asset_tests combat_scenario_runner` passed.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "(move_asset_tests|combat_runtime_tests)" --output-on-failure` passed: 2/2.
+- Guarded golden updates were produced with `VAC_UPDATE_GOLDENS=1` for `sword_light_hits_idle_target`, `sword_light_whiffs`, `sword_light_cancel_on_hit`, and `dodge_invulnerability_boundary`.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "combat_scenario" --output-on-failure` passed: 6/6 after clearing `VAC_UPDATE_GOLDENS`.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` passed.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "visual_lab_tests" --output-on-failure` passed: 1/1 after updating the intentional trace/hash expectations.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 27/27.
+- `build/msvc-debug/test-artifacts/visual_lab_scenario_smoke_result.json` reported `scenarioTraceEventCount=13` and `scenarioFinalStateHash=0xf73237aa3baea830`.
 
 ## Final Commits
 
-Fill this after implementation.
+- `6aed506` Record SP2-001 start commit
+- `3bc2783` Add combat damage reaction effects
+- `83c0ed3` Update visual lab scenario diagnostics for damage traces
