@@ -362,7 +362,9 @@ void executeCommand(MapCommandResult &result,
             return;
         }
         const std::filesystem::path savePath = resolvePath(*requestedPath, options.workingDirectory);
-        std::filesystem::create_directories(savePath.parent_path());
+        if (!savePath.parent_path().empty()) {
+            std::filesystem::create_directories(savePath.parent_path());
+        }
         content::saveAuthoringScene(result.scene, savePath);
         result.savedPath = savePath;
         result.scene.sourcePath = savePath;
