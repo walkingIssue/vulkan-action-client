@@ -14,7 +14,8 @@ Detected and prepared:
 - Shader tools: `glslc` and `dxc`
 - Vulkan runtime working on Intel Arc A770
 - vcpkg at `C:\Users\Bartek\Documents\Playground\tools\vcpkg`
-- Git LFS 3.7.1 at `C:\Users\Bartek\Documents\Playground\tools\git-lfs-3.7.1`
+- Git LFS 3.7.1
+- LLVM 22.1.8 for `clang-format` and `clang-tidy`
 
 Git signing is disabled locally for this repository:
 
@@ -37,14 +38,26 @@ That activates the MSVC x64 build environment and adds the Vulkan SDK and WinGet
 
 It also exposes local workspace tools such as `vcpkg`, `git-lfs`, and portable RenderDoc when available.
 
-## Dependencies
+## Build And Test
 
-The project uses vcpkg manifest mode. After entering the dev shell:
+The canonical build and test interface is CMake presets plus CTest. Use the dev shell or a Visual Studio developer shell so MSVC and Ninja are visible, then run:
 
 ```powershell
-vcpkg install --triplet x64-windows
 cmake --preset msvc-debug
+cmake --build --preset msvc-debug
+ctest --preset msvc-debug
 ```
+
+Useful test slices:
+
+```powershell
+ctest --preset msvc-debug-unit
+ctest --preset msvc-debug-network
+ctest --preset msvc-debug-e2e
+ctest --preset msvc-debug-combat
+```
+
+The project uses vcpkg manifest mode through `CMakePresets.json`; CMake runs vcpkg install during configure. The PowerShell scripts in `tools/` are convenience wrappers around the same preset path.
 
 ## Bootstrap Scene
 
@@ -105,7 +118,7 @@ Clients explicitly connect before snapshots are accepted and disconnect on shutd
 Run the regression suite:
 
 ```powershell
-.\tools\test.ps1
+ctest --preset msvc-debug
 ```
 
 ## Architecture Notes
