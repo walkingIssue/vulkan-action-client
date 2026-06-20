@@ -14,6 +14,25 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
+add_library(content_core
+    src/content/authoring_scene.cpp
+)
+
+target_compile_features(content_core PUBLIC cxx_std_20)
+
+target_include_directories(content_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(content_core PUBLIC
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(content_core PUBLIC
+    glm::glm
+    nlohmann_json::nlohmann_json
+)
+
 add_library(scene_core
     src/config/control_profile.cpp
     src/combat/combat_simulation.cpp
@@ -188,6 +207,22 @@ if(WIN32)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(authoring_scene_tests
+        tests/authoring_scene_tests.cpp
+    )
+
+    target_compile_features(authoring_scene_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(authoring_scene_tests PRIVATE
+        content_core
+    )
+
+    add_test(NAME authoring_scene_tests COMMAND authoring_scene_tests)
+    set_tests_properties(authoring_scene_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;content;authoring;map"
+    )
+
     add_executable(movement_behavior_tests
         tests/movement_behavior_tests.cpp
     )

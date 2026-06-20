@@ -102,6 +102,16 @@
       }
     },
     {
+      "name": "msvc-debug-content",
+      "displayName": "MSVC Debug Content Tests",
+      "inherits": "msvc-debug",
+      "filter": {
+        "include": {
+          "label": "content"
+        }
+      }
+    },
+    {
       "name": "msvc-debug-characterization",
       "displayName": "MSVC Debug Characterization Tests",
       "inherits": "msvc-debug",

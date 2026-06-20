@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "map-guid-basic-primitive-arena",
+  "logicalId": "map.basic_primitive_arena",
+  "unitsPerMeter": 1.0,
+  "coordinateSystem": "RH_Y_UP_NEG_Z_FORWARD",
+  "worldBounds": {
+    "min": [-25.0, -1.0, -25.0],
+    "max": [25.0, 10.0, 25.0],
+    "killHeight": -8.0
+  },
+  "objects": [
+    {
+      "id": "training_crate",
+      "name": "Training Crate",
+      "transform": {
+        "translation": [5.0, 1.0, -3.0],
+        "rotationDegrees": [0.0, 15.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "primitive": {
+        "type": "box",
+        "size": [2.0, 2.0, 2.0]
+      },
+      "material": {
+        "baseColor": [0.22, 0.55, 0.44, 1.0]
+      },
+      "collider": {
+        "type": "box",
+        "size": [2.0, 2.0, 2.0],
+        "mode": "static",
+        "layer": "world",
+        "mask": ["character"]
+      }
+    },
+    {
+      "id": "arena_floor",
+      "name": "Arena Floor",
+      "transform": {
+        "translation": [0.0, -0.125, 0.0],
+        "rotationDegrees": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "primitive": {
+        "type": "box",
+        "size": [40.0, 0.25, 40.0]
+      },
+      "material": {
+        "baseColor": [0.28, 0.30, 0.34, 1.0]
+      },
+      "collider": {
+        "type": "box",
+        "size": [40.0, 0.25, 40.0],
+        "mode": "static",
+        "layer": "world",
+        "mask": ["character", "weapon"]
+      }
+    },
+    {
+      "id": "dummy_target",
+      "name": "Dummy Target",
+      "transform": {
+        "translation": [0.0, 1.0, -8.0],
+        "rotationDegrees": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      },
+      "primitive": {
+        "type": "box",
+        "size": [1.0, 2.0, 1.0]
+      },
+      "material": {
+        "baseColor": [0.75, 0.24, 0.24, 1.0]
+      },
+      "collider": {
+        "type": "box",
+        "size": [1.0, 2.0, 1.0],
+        "mode": "dynamic",
+        "layer": "character",
+        "mask": ["weapon"]
+      }
+    }
+  ],
+  "spawnPoints": [
+    {
+      "id": "player_spawn",
+      "team": "player",
+      "translation": [0.0, 0.0, 8.0],
+      "yawDegrees": 180.0,
+      "enabled": true,
+      "tags": ["player", "default"]
+    },
+    {
+      "id": "enemy_spawn",
+      "team": "enemy",
+      "translation": [0.0, 0.0, -8.0],
+      "yawDegrees": 0.0,
+      "enabled": true,
+      "tags": ["enemy", "dummy"]
+    }
+  ]
+}

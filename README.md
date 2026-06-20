@@ -55,6 +55,7 @@ ctest --preset msvc-debug-unit
 ctest --preset msvc-debug-network
 ctest --preset msvc-debug-e2e
 ctest --preset msvc-debug-combat
+ctest --preset msvc-debug-content
 ctest --preset msvc-debug-characterization
 ctest --preset msvc-debug-viewer
 ```

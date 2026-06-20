@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "invalid-world-bounds",
+  "logicalId": "map.invalid.world_bounds",
+  "unitsPerMeter": 1.0,
+  "coordinateSystem": "RH_Y_UP_NEG_Z_FORWARD",
+  "worldBounds": {
+    "min": [10.0, -1.0, -10.0],
+    "max": [-10.0, 5.0, 10.0],
+    "killHeight": -6.0
+  },
+  "objects": [
+    {
+      "id": "blocker",
+      "name": "Blocker",
+      "transform": {"translation": [0.0, 0.5, 0.0], "rotationDegrees": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0]},
+      "primitive": {"type": "box", "size": [1.0, 1.0, 1.0]},
+      "material": {"baseColor": [0.4, 0.4, 0.4, 1.0]},
+      "collider": {"type": "box", "size": [1.0, 1.0, 1.0], "mode": "static", "layer": "world", "mask": ["character"]}
+    }
+  ],
+  "spawnPoints": [
+    {"id": "spawn", "team": "player", "translation": [0.0, 0.0, 0.0], "yawDegrees": 0.0, "enabled": true, "tags": ["default"]}
+  ]
+}
