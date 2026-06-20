@@ -1,6 +1,6 @@
 # SP2-004: Scenario Playback Controls in Visual Lab v1
 
-Status: in progress
+Status: ready for merge
 Branch: sprint02/sp2-004-scenario-playback-controls
 Start commit: `79cca54`
 Source plan: `docs/sprint-02-implementation-plan.md`
@@ -100,7 +100,17 @@ Ownership boundaries:
 
 - `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target visual_lab_tests` passed.
 - `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "visual_lab" --output-on-failure` passed: 3/3.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target visual_lab_tests vulkan_scene_viewer` passed and refreshed the scenario smoke executable.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "visual_lab" --output-on-failure` passed again after rebuilding `vulkan_scene_viewer`: 3/3.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` passed with no work to do.
+- `. .\tools\dev-shell.ps1; Remove-Item Env:VAC_UPDATE_GOLDENS -ErrorAction SilentlyContinue; ctest --preset msvc-debug-viewer --output-on-failure` passed: 5/5.
+- `. .\tools\dev-shell.ps1; Remove-Item Env:VAC_UPDATE_GOLDENS -ErrorAction SilentlyContinue; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13.
+- `. .\tools\dev-shell.ps1; Remove-Item Env:VAC_UPDATE_GOLDENS -ErrorAction SilentlyContinue; ctest --preset msvc-debug --output-on-failure` passed: 27/27.
+- MSVC runtime/assertion dialog check found no matching visible dialogs.
+- `build/msvc-debug/test-artifacts/visual_lab_scenario_smoke_result.json` includes playback diagnostics (`visualLabPlayback=true`, `playbackPreviewStepTick=1`, `playbackPreviewResetTick=0`, `playbackPreviewSeekEndTick=36`) and scenario evidence diagnostics (`scenarioEvidenceEventCount=13`, `scenarioEvidenceTotalDamage=12`, `scenarioEvidenceReactionMoves=move.hit_reaction`).
+- `assets/` remained untouched and unstaged.
 
 ## Final Commits
 
-Fill this after implementation.
+- `79cca54` Start SP2-004 scenario playback controls
+- `fd11fd3` Add visual lab scenario playback evidence
