@@ -8,12 +8,13 @@ layout(location = 0) out vec3 outNormal;
 layout(location = 1) out vec3 outColor;
 
 layout(push_constant) uniform PushConstants {
-    mat4 viewProjection;
+    mat4 modelViewProjection;
+    vec4 color;
 } pc;
 
 void main()
 {
-    gl_Position = pc.viewProjection * vec4(inPosition, 1.0);
+    gl_Position = pc.modelViewProjection * vec4(inPosition, 1.0);
     outNormal = inNormal;
-    outColor = inColor;
+    outColor = inColor * pc.color.rgb;
 }

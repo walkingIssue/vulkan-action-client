@@ -1,0 +1,39 @@
+#pragma once
+
+#include <glm/glm.hpp>
+
+#include "scene/scene_runtime.hpp"
+
+namespace vac::combat
+{
+inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
+inline constexpr int kMaxCatchUpTicksPerFrame = 5;
+inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
+inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;
+inline constexpr float kArenaEdgeInsetWorldUnits = 5.0f;
+
+struct MoveIntent
+{
+    glm::vec2 direction{0.0f};
+};
+
+struct ArenaLimits
+{
+    glm::vec2 halfExtents{200.0f};
+    float edgeInset = kArenaEdgeInsetWorldUnits;
+};
+
+struct ActorState
+{
+    Transform previousTransform;
+    Transform currentTransform;
+    float moveSpeedWorldUnitsPerSecond = kPlayerMoveSpeedWorldUnitsPerSecond;
+};
+
+void beginTick(ActorState &actor);
+bool applyMoveIntent(ActorState &actor,
+                     MoveIntent intent,
+                     float deltaSeconds,
+                     ArenaLimits arena);
+Transform interpolate(const ActorState &actor, float alpha);
+} // namespace vac::combat

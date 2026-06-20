@@ -48,6 +48,19 @@ presentation
 
 The simulation can produce compact presentation commands each tick. The renderer can consume those commands at display rate and interpolate where needed. That gives us correctness first, then visual polish on top.
 
+## Speed Model
+
+Movement speed belongs to combat state, not rendering. Inputs should be dimensionless intent such as "move northeast at full stick tilt"; the combat layer turns that into velocity using authored constants.
+
+For now the prototype uses world units per second:
+
+```cpp
+inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
+inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
+```
+
+The healthy long-term model is the same, but with normalized scale: once character assets and arenas agree on a meter-like unit, the constants can become meters per second. Presentation should not decide how far a dodge, walk, or attack lunge moves. It should interpolate the previous and current combat transforms and render that state smoothly.
+
 ## C++ Bias
 
 Use thin, explicit data types in hot logic:

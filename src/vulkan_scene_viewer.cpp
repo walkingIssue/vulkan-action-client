@@ -28,12 +28,14 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <fmt/format.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <spdlog/spdlog.h>
 
+#include "combat/combat_simulation.hpp"
 #include "render/scene_geometry.hpp"
 #include "scene/scene_runtime.hpp"
 
@@ -90,6 +92,18 @@ struct Image
     VkImage image = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
     VkImageView view = VK_NULL_HANDLE;
+};
+
+struct ModelBuffer
+{
+    Buffer buffer;
+    uint32_t vertexCount = 0;
+};
+
+struct PushConstants
+{
+    glm::mat4 modelViewProjection{1.0f};
+    glm::vec4 color{1.0f};
 };
 
 std::vector<char> readFile(const std::filesystem::path &path)
@@ -152,8 +166,10 @@ public:
         : m_options(std::move(options))
     {
         m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
-        m_drawData = vac::buildSceneDrawData(m_scene);
+        m_renderData = vac::buildSceneRenderData(m_scene);
+        m_lineData = vac::buildSceneLineData(m_scene);
         findControllableActors();
+        initializeCombatActors();
     }
 
     ~VulkanSceneViewer()
@@ -172,7 +188,9 @@ public:
 private:
     ViewerOptions m_options;
     vac::SceneRuntime m_scene;
-    vac::SceneDrawData m_drawData;
+    vac::SceneRenderData m_renderData;
+    vac::SceneDrawData m_lineData;
+    std::vector<vac::combat::ActorState> m_actorStates;
 
     GLFWwindow *m_window = nullptr;
     VkInstance m_instance = VK_NULL_HANDLE;
@@ -194,8 +212,11 @@ private:
     std::vector<VkFramebuffer> m_framebuffers;
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> m_commandBuffers;
-    Buffer m_triangleBuffer;
+    Buffer m_staticTriangleBuffer;
     Buffer m_lineBuffer;
+    std::unordered_map<std::string, ModelBuffer> m_modelBuffers;
+    uint32_t m_staticTriangleVertexCount = 0;
+    uint32_t m_lineVertexCount = 0;
     Image m_depthImage;
     std::vector<VkSemaphore> m_imageAvailableSemaphores;
     std::vector<VkSemaphore> m_renderFinishedSemaphores;
@@ -203,11 +224,13 @@ private:
     std::vector<VkFence> m_imagesInFlight;
     size_t m_currentFrame = 0;
     float m_sceneTimeSeconds = 0.0f;
+    float m_fixedAccumulatorSeconds = 0.0f;
+    float m_presentationAlpha = 1.0f;
     float m_fpsAccumulatorSeconds = 0.0f;
     uint32_t m_fpsFrames = 0;
     std::optional<size_t> m_playerIndex;
     std::optional<size_t> m_sparringIndex;
-    bool m_sceneGeometryDirty = false;
+    bool m_lineGeometryDirty = false;
     bool m_framebufferResized = false;
 
     static void framebufferResizeCallback(GLFWwindow *window, int, int)
@@ -305,26 +328,99 @@ private:
         }
     }
 
+    void initializeCombatActors()
+    {
+        m_actorStates.resize(m_scene.instances.size());
+        for (size_t i = 0; i < m_scene.instances.size(); ++i) {
+            vac::combat::ActorState &actor = m_actorStates[i];
+            actor.previousTransform = m_scene.instances[i].transform;
+            actor.currentTransform = m_scene.instances[i].transform;
+            actor.moveSpeedWorldUnitsPerSecond = (m_playerIndex.has_value() && i == *m_playerIndex)
+                ? vac::combat::kPlayerMoveSpeedWorldUnitsPerSecond
+                : vac::combat::kSparringMoveSpeedWorldUnitsPerSecond;
+        }
+    }
+
     void updateSimulation(float deltaSeconds)
     {
+        m_fixedAccumulatorSeconds += std::min(deltaSeconds, 0.25f);
+
+        const vac::combat::MoveIntent playerIntent{readPlayerMove()};
+        const vac::combat::MoveIntent sparringIntent{
+            readKeyboardMove(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN),
+        };
+        const vac::combat::ArenaLimits arena = arenaLimits();
+
+        int ticks = 0;
         bool moved = false;
+        while (m_fixedAccumulatorSeconds >= vac::combat::kFixedTickSeconds &&
+               ticks < vac::combat::kMaxCatchUpTicksPerFrame) {
+            for (vac::combat::ActorState &actor : m_actorStates) {
+                vac::combat::beginTick(actor);
+            }
 
-        if (m_playerIndex.has_value()) {
-            moved |= applyMovement(*m_playerIndex, readPlayerMove(), deltaSeconds, 18.0f);
+            if (m_playerIndex.has_value()) {
+                moved |= vac::combat::applyMoveIntent(m_actorStates[*m_playerIndex],
+                                                      playerIntent,
+                                                      vac::combat::kFixedTickSeconds,
+                                                      arena);
+            }
+
+            if (m_sparringIndex.has_value()) {
+                moved |= vac::combat::applyMoveIntent(m_actorStates[*m_sparringIndex],
+                                                      sparringIntent,
+                                                      vac::combat::kFixedTickSeconds,
+                                                      arena);
+            }
+
+            m_fixedAccumulatorSeconds -= vac::combat::kFixedTickSeconds;
+            ++ticks;
         }
 
-        if (m_sparringIndex.has_value()) {
-            moved |= applyMovement(*m_sparringIndex,
-                                   readKeyboardMove(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN),
-                                   deltaSeconds,
-                                   14.0f);
+        if (ticks == vac::combat::kMaxCatchUpTicksPerFrame &&
+            m_fixedAccumulatorSeconds >= vac::combat::kFixedTickSeconds) {
+            m_fixedAccumulatorSeconds = 0.0f;
         }
 
-        if (moved) {
-            vac::refreshSceneBounds(m_scene);
-            m_drawData = vac::buildSceneDrawData(m_scene);
-            m_sceneGeometryDirty = true;
+        m_presentationAlpha = std::clamp(m_fixedAccumulatorSeconds / vac::combat::kFixedTickSeconds, 0.0f, 1.0f);
+
+        if (ticks > 0 && moved) {
+            syncSceneToCombatCurrent();
         }
+    }
+
+    vac::combat::ArenaLimits arenaLimits() const
+    {
+        for (const vac::ProceduralInstance &instance : m_scene.procedural) {
+            if (instance.type == "floor") {
+                return {
+                    instance.size * 0.5f,
+                    vac::combat::kArenaEdgeInsetWorldUnits,
+                };
+            }
+        }
+
+        return {};
+    }
+
+    void syncSceneToCombatCurrent()
+    {
+        for (size_t i = 0; i < m_scene.instances.size() && i < m_actorStates.size(); ++i) {
+            m_scene.instances[i].transform = m_actorStates[i].currentTransform;
+        }
+
+        vac::refreshSceneBounds(m_scene);
+        m_lineData = vac::buildSceneLineData(m_scene);
+        m_lineGeometryDirty = true;
+    }
+
+    vac::Transform presentationTransform(size_t actorIndex) const
+    {
+        if (actorIndex >= m_actorStates.size()) {
+            return m_scene.instances[actorIndex].transform;
+        }
+
+        return vac::combat::interpolate(m_actorStates[actorIndex], m_presentationAlpha);
     }
 
     glm::vec2 readPlayerMove() const
@@ -389,34 +485,6 @@ private:
     }
 #endif
 
-    bool applyMovement(size_t actorIndex, glm::vec2 move, float deltaSeconds, float speed)
-    {
-        if (glm::dot(move, move) <= 0.0001f) {
-            return false;
-        }
-
-        vac::SceneInstance &actor = m_scene.instances[actorIndex];
-        actor.transform.translation.x += move.x * speed * deltaSeconds;
-        actor.transform.translation.z += move.y * speed * deltaSeconds;
-        actor.transform.rotationDegrees.y = glm::degrees(std::atan2(move.x, move.y));
-        clampToArena(actor.transform.translation);
-        return true;
-    }
-
-    void clampToArena(glm::vec3 &position) const
-    {
-        for (const vac::ProceduralInstance &instance : m_scene.procedural) {
-            if (instance.type != "floor") {
-                continue;
-            }
-
-            const glm::vec2 half = instance.size * 0.5f - glm::vec2{5.0f};
-            position.x = std::clamp(position.x, -half.x, half.x);
-            position.z = std::clamp(position.z, -half.y, half.y);
-            return;
-        }
-    }
-
     void updateWindowTitle(float deltaSeconds)
     {
         m_fpsAccumulatorSeconds += deltaSeconds;
@@ -429,7 +497,7 @@ private:
         const float fps = static_cast<float>(m_fpsFrames) / m_fpsAccumulatorSeconds;
         glm::vec3 playerPosition{0.0f};
         if (m_playerIndex.has_value()) {
-            playerPosition = m_scene.instances[*m_playerIndex].transform.translation;
+            playerPosition = presentationTransform(*m_playerIndex).translation;
         }
 
         const std::string title = fmt::format("Vulkan Action Client - {:.0f} FPS | player x={:.1f} z={:.1f}",
@@ -466,8 +534,12 @@ private:
 
             cleanupSwapChain();
 
-            destroyBuffer(m_triangleBuffer);
+            destroyBuffer(m_staticTriangleBuffer);
             destroyBuffer(m_lineBuffer);
+            for (auto &[_, modelBuffer] : m_modelBuffers) {
+                destroyBuffer(modelBuffer.buffer);
+            }
+            m_modelBuffers.clear();
 
             vkDestroyPipeline(m_device, m_trianglePipeline, nullptr);
             vkDestroyPipeline(m_device, m_linePipeline, nullptr);
@@ -1034,7 +1106,7 @@ private:
         VkPushConstantRange pushConstantRange{};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         pushConstantRange.offset = 0;
-        pushConstantRange.size = sizeof(glm::mat4);
+        pushConstantRange.size = sizeof(PushConstants);
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1129,11 +1201,34 @@ private:
 
     void createVertexBuffers()
     {
-        createVertexBuffer(m_drawData.triangleVertices, m_triangleBuffer);
-        createVertexBuffer(m_drawData.lineVertices, m_lineBuffer);
-        spdlog::info("Scene viewer vertices: triangles={} lines={}",
-                     m_drawData.triangleVertices.size(),
-                     m_drawData.lineVertices.size());
+        m_staticTriangleVertexCount = static_cast<uint32_t>(m_renderData.staticTriangleVertices.size());
+        createVertexBuffer(m_renderData.staticTriangleVertices, m_staticTriangleBuffer);
+        const std::vector<vac::SceneVertex> lineVertices = combinedLineVertices();
+        m_lineVertexCount = static_cast<uint32_t>(lineVertices.size());
+        createVertexBuffer(lineVertices, m_lineBuffer);
+
+        size_t modelVertexCount = 0;
+        for (const auto &[modelId, vertices] : m_renderData.modelVerticesById) {
+            ModelBuffer modelBuffer;
+            modelBuffer.vertexCount = static_cast<uint32_t>(vertices.size());
+            createVertexBuffer(vertices, modelBuffer.buffer);
+            modelVertexCount += vertices.size();
+            m_modelBuffers.emplace(modelId, std::move(modelBuffer));
+        }
+
+        spdlog::info("Scene viewer vertices: static_triangles={} model_vertices={} lines={}",
+                     m_renderData.staticTriangleVertices.size(),
+                     modelVertexCount,
+                     m_lineVertexCount);
+    }
+
+    std::vector<vac::SceneVertex> combinedLineVertices() const
+    {
+        std::vector<vac::SceneVertex> vertices;
+        vertices.reserve(m_renderData.staticLineVertices.size() + m_lineData.lineVertices.size());
+        vertices.insert(vertices.end(), m_renderData.staticLineVertices.begin(), m_renderData.staticLineVertices.end());
+        vertices.insert(vertices.end(), m_lineData.lineVertices.begin(), m_lineData.lineVertices.end());
+        return vertices;
     }
 
     void createVertexBuffer(const std::vector<vac::SceneVertex> &vertices, Buffer &buffer)
@@ -1192,58 +1287,57 @@ private:
 
     glm::mat4 viewProjection() const
     {
-        vac::Bounds focusBounds;
-        if (m_playerIndex.has_value()) {
-            focusBounds = m_scene.instances[*m_playerIndex].worldBounds;
-        }
-
-        if (!focusBounds.valid) {
-            for (const vac::SceneInstance &instance : m_scene.instances) {
-                if (!instance.worldBounds.valid) {
-                    continue;
-                }
-                if (!focusBounds.valid) {
-                    focusBounds = instance.worldBounds;
-                } else {
-                    focusBounds.min = glm::min(focusBounds.min, instance.worldBounds.min);
-                    focusBounds.max = glm::max(focusBounds.max, instance.worldBounds.max);
-                }
-            }
-        }
-
-        const vac::Bounds &cameraBounds = focusBounds.valid ? focusBounds : m_scene.worldBounds;
-        const glm::vec3 center = cameraBounds.valid
-            ? (cameraBounds.min + cameraBounds.max) * 0.5f
-            : glm::vec3{0.0f, 4.0f, 0.0f};
-        const glm::vec3 extent = cameraBounds.valid
-            ? cameraBounds.max - cameraBounds.min
-            : glm::vec3{18.0f, 12.0f, 18.0f};
-        const float focusRadius = std::max({extent.x, extent.y, extent.z, 18.0f}) * 0.5f;
         const float worldRadius = m_scene.worldBounds.valid
             ? std::max({m_scene.worldBounds.max.x - m_scene.worldBounds.min.x,
                         m_scene.worldBounds.max.y - m_scene.worldBounds.min.y,
                         m_scene.worldBounds.max.z - m_scene.worldBounds.min.z,
                         18.0f}) * 0.5f
-            : focusRadius;
-        const float cameraDistance = focusRadius * 2.4f;
-        const float cameraHeight = std::max(focusRadius * 0.95f, 10.0f);
+            : 32.0f;
 
-        glm::vec3 cameraOffset{cameraDistance * 0.50f, cameraHeight, cameraDistance};
+        vac::Transform anchorTransform;
+        if (m_playerIndex.has_value()) {
+            anchorTransform = presentationTransform(*m_playerIndex);
+        }
+
+        const float yaw = glm::radians(anchorTransform.rotationDegrees.y);
+        const glm::vec3 forward{std::sin(yaw), 0.0f, std::cos(yaw)};
+        const glm::vec3 right{std::cos(yaw), 0.0f, -std::sin(yaw)};
+        const glm::vec3 anchor = anchorTransform.translation + glm::vec3{0.0f, 6.5f, 0.0f};
+        glm::vec3 cameraOffset = -forward * 34.0f + right * 5.0f + glm::vec3{0.0f, 17.0f, 0.0f};
+
         if (m_options.orbitCamera) {
             const float orbitRadians = m_sceneTimeSeconds * 0.22f;
             const glm::mat4 orbit = glm::rotate(glm::mat4{1.0f}, orbitRadians, glm::vec3{0.0f, 1.0f, 0.0f});
             cameraOffset = glm::vec3{orbit * glm::vec4{cameraOffset, 0.0f}};
         }
 
-        const glm::vec3 eye = center + cameraOffset;
+        const glm::vec3 eye = anchor + cameraOffset;
+        const glm::vec3 target = anchor + forward * 8.0f;
 
-        glm::mat4 view = glm::lookAt(eye, center + glm::vec3{0.0f, 2.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f});
+        glm::mat4 view = glm::lookAt(eye, target, glm::vec3{0.0f, 1.0f, 0.0f});
         glm::mat4 projection = glm::perspective(glm::radians(50.0f),
                                                 static_cast<float>(m_swapChainExtent.width) / static_cast<float>(m_swapChainExtent.height),
                                                 0.1f,
                                                 std::max(100.0f, worldRadius * 6.0f));
         projection[1][1] *= -1.0f;
         return projection * view;
+    }
+
+    void pushDrawConstants(VkCommandBuffer commandBuffer,
+                           const glm::mat4 &viewProjection,
+                           const glm::mat4 &model,
+                           glm::vec3 color)
+    {
+        const PushConstants pushConstants{
+            viewProjection * model,
+            glm::vec4{color, 1.0f},
+        };
+        vkCmdPushConstants(commandBuffer,
+                           m_pipelineLayout,
+                           VK_SHADER_STAGE_VERTEX_BIT,
+                           0,
+                           sizeof(PushConstants),
+                           &pushConstants);
     }
 
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -1271,19 +1365,35 @@ private:
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         const glm::mat4 vp = viewProjection();
-        vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
 
         VkDeviceSize offsets[] = {0};
-        if (!m_drawData.triangleVertices.empty()) {
+        if (m_staticTriangleVertexCount > 0) {
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_trianglePipeline);
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_triangleBuffer.buffer, offsets);
-            vkCmdDraw(commandBuffer, static_cast<uint32_t>(m_drawData.triangleVertices.size()), 1, 0, 0);
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_staticTriangleBuffer.buffer, offsets);
+            pushDrawConstants(commandBuffer, vp, glm::mat4{1.0f}, {1.0f, 1.0f, 1.0f});
+            vkCmdDraw(commandBuffer, m_staticTriangleVertexCount, 1, 0, 0);
         }
 
-        if (!m_drawData.lineVertices.empty()) {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_trianglePipeline);
+        for (size_t instanceIndex = 0; instanceIndex < m_scene.instances.size(); ++instanceIndex) {
+            const vac::SceneInstance &instance = m_scene.instances[instanceIndex];
+            const auto bufferIt = m_modelBuffers.find(instance.modelId);
+            if (bufferIt == m_modelBuffers.end() || bufferIt->second.vertexCount == 0) {
+                continue;
+            }
+
+            const vac::Transform transform = presentationTransform(instanceIndex);
+            const glm::mat4 model = vac::makeTransformMatrix(transform);
+            pushDrawConstants(commandBuffer, vp, model, vac::instanceColor(instanceIndex));
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &bufferIt->second.buffer.buffer, offsets);
+            vkCmdDraw(commandBuffer, bufferIt->second.vertexCount, 1, 0, 0);
+        }
+
+        if (m_lineVertexCount > 0) {
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_linePipeline);
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_lineBuffer.buffer, offsets);
-            vkCmdDraw(commandBuffer, static_cast<uint32_t>(m_drawData.lineVertices.size()), 1, 0, 0);
+            pushDrawConstants(commandBuffer, vp, glm::mat4{1.0f}, {1.0f, 1.0f, 1.0f});
+            vkCmdDraw(commandBuffer, m_lineVertexCount, 1, 0, 0);
         }
 
         vkCmdEndRenderPass(commandBuffer);
@@ -1351,10 +1461,11 @@ private:
     {
         vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
-        if (m_sceneGeometryDirty) {
-            uploadVertexBuffer(m_drawData.triangleVertices, m_triangleBuffer);
-            uploadVertexBuffer(m_drawData.lineVertices, m_lineBuffer);
-            m_sceneGeometryDirty = false;
+        if (m_lineGeometryDirty) {
+            const std::vector<vac::SceneVertex> lineVertices = combinedLineVertices();
+            m_lineVertexCount = static_cast<uint32_t>(lineVertices.size());
+            uploadVertexBuffer(lineVertices, m_lineBuffer);
+            m_lineGeometryDirty = false;
         }
 
         uint32_t imageIndex = 0;

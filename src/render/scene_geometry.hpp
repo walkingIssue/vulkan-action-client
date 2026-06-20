@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -21,6 +23,15 @@ struct SceneDrawData
     std::vector<SceneVertex> lineVertices;
 };
 
+struct SceneRenderData
+{
+    std::vector<SceneVertex> staticTriangleVertices;
+    std::vector<SceneVertex> staticLineVertices;
+    std::unordered_map<std::string, std::vector<SceneVertex>> modelVerticesById;
+};
+
 glm::mat4 makeTransformMatrix(const Transform &transform);
-SceneDrawData buildSceneDrawData(const SceneRuntime &scene);
+glm::vec3 instanceColor(size_t index);
+SceneRenderData buildSceneRenderData(const SceneRuntime &scene);
+SceneDrawData buildSceneLineData(const SceneRuntime &scene);
 } // namespace vac

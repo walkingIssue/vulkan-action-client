@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
-#include <unordered_map>
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -26,19 +25,6 @@ struct MeshGeometry
 {
     std::vector<MeshVertex> vertices;
 };
-
-glm::vec3 instanceColor(size_t index)
-{
-    static constexpr std::array<glm::vec3, 6> colors = {
-        glm::vec3{0.78f, 0.74f, 0.66f},
-        glm::vec3{0.46f, 0.72f, 0.95f},
-        glm::vec3{0.94f, 0.58f, 0.44f},
-        glm::vec3{0.60f, 0.86f, 0.55f},
-        glm::vec3{0.85f, 0.66f, 0.95f},
-        glm::vec3{0.96f, 0.86f, 0.44f},
-    };
-    return colors[index % colors.size()];
-}
 
 MeshGeometry loadMeshGeometry(const ModelStats &model)
 {
@@ -154,6 +140,19 @@ void appendFloor(SceneDrawData &drawData, const ProceduralInstance &floor)
 }
 } // namespace
 
+glm::vec3 instanceColor(size_t index)
+{
+    static constexpr std::array<glm::vec3, 6> colors = {
+        glm::vec3{0.78f, 0.74f, 0.66f},
+        glm::vec3{0.46f, 0.72f, 0.95f},
+        glm::vec3{0.94f, 0.58f, 0.44f},
+        glm::vec3{0.60f, 0.86f, 0.55f},
+        glm::vec3{0.85f, 0.66f, 0.95f},
+        glm::vec3{0.96f, 0.86f, 0.44f},
+    };
+    return colors[index % colors.size()];
+}
+
 glm::mat4 makeTransformMatrix(const Transform &transform)
 {
     glm::mat4 matrix{1.0f};
@@ -165,44 +164,43 @@ glm::mat4 makeTransformMatrix(const Transform &transform)
     return matrix;
 }
 
-SceneDrawData buildSceneDrawData(const SceneRuntime &scene)
+SceneRenderData buildSceneRenderData(const SceneRuntime &scene)
 {
-    SceneDrawData drawData;
-    std::unordered_map<std::string, MeshGeometry> geometryByModel;
+    SceneRenderData renderData;
 
     for (const auto &[modelId, model] : scene.models) {
-        geometryByModel.emplace(modelId, loadMeshGeometry(model));
+        const MeshGeometry geometry = loadMeshGeometry(model);
+        std::vector<SceneVertex> vertices;
+        vertices.reserve(geometry.vertices.size());
+        for (const MeshVertex &vertex : geometry.vertices) {
+            vertices.push_back({vertex.position, vertex.normal, {1.0f, 1.0f, 1.0f}});
+        }
+        renderData.modelVerticesById.emplace(modelId, std::move(vertices));
     }
 
+    SceneDrawData staticDrawData;
     for (const ProceduralInstance &procedural : scene.procedural) {
         if (procedural.type == "floor") {
-            appendFloor(drawData, procedural);
-            appendBounds(drawData, procedural.worldBounds, {0.45f, 0.52f, 0.58f});
+            appendFloor(staticDrawData, procedural);
+            appendBounds(staticDrawData, procedural.worldBounds, {0.45f, 0.52f, 0.58f});
         }
     }
+    appendBounds(staticDrawData, scene.worldBounds, {0.40f, 0.95f, 0.72f});
 
-    for (size_t instanceIndex = 0; instanceIndex < scene.instances.size(); ++instanceIndex) {
-        const SceneInstance &instance = scene.instances[instanceIndex];
-        const auto geometryIt = geometryByModel.find(instance.modelId);
-        if (geometryIt == geometryByModel.end()) {
-            continue;
-        }
+    renderData.staticTriangleVertices = std::move(staticDrawData.triangleVertices);
+    renderData.staticLineVertices = std::move(staticDrawData.lineVertices);
+    return renderData;
+}
 
-        const glm::mat4 transform = makeTransformMatrix(instance.transform);
-        const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
-        const glm::vec3 color = instanceColor(instanceIndex);
+SceneDrawData buildSceneLineData(const SceneRuntime &scene)
+{
+    SceneDrawData drawData;
 
-        drawData.triangleVertices.reserve(drawData.triangleVertices.size() + geometryIt->second.vertices.size());
-        for (const MeshVertex &vertex : geometryIt->second.vertices) {
-            const glm::vec3 position = glm::vec3{transform * glm::vec4{vertex.position, 1.0f}};
-            const glm::vec3 normal = glm::normalize(normalMatrix * vertex.normal);
-            drawData.triangleVertices.push_back({position, normal, color});
-        }
-
+    for (const SceneInstance &instance : scene.instances) {
         appendBounds(drawData, instance.worldBounds, {1.0f, 0.92f, 0.36f});
     }
 
-    appendBounds(drawData, scene.worldBounds, {0.40f, 0.95f, 0.72f});
     return drawData;
 }
+
 } // namespace vac
