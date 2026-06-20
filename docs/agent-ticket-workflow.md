@@ -219,6 +219,40 @@ Multiple agents may be running on the same machine from sibling copies of this r
 - Pull or inspect remote refs before major merges when another agent may have pushed.
 - Patience is key; a transient Windows file lock is usually coordination noise, not a design signal.
 
+## Local Agent Comms Protocol
+
+Use the untracked machine-local coordination board when multiple agents are active:
+
+```text
+C:\Users\Bartek\Documents\Playground\vulkan-agent-comms
+```
+
+The directory is intentionally outside this repository so Git operations do not stage, reset, or branch-switch it away.
+
+Expected files:
+
+```text
+status/agent-a.md
+status/agent-b.md
+claims/README.md
+inbox/agent-a.md
+inbox/agent-b.md
+decisions.md
+merge-log.md
+```
+
+Coordination rules:
+
+- At start of work, append branch, checkout path, current task, and likely touched files to your `status/<agent>.md`.
+- Before editing high-conflict files, append a claim with intent, files, response deadline, and default action.
+- Use a 2-minute response window for routine claims. If no response appears, proceed conservatively with the smallest useful change.
+- For direct requests, append to the other agent's inbox and include the same response deadline and default action.
+- Record durable cross-ticket decisions in `decisions.md`.
+- Before push or merge, append branch, commit, tests, and watchouts to `merge-log.md`.
+- Keep all notes append-only. Do not rewrite another agent's notes except to add a clearly marked response.
+
+High-conflict files include `CMakeLists.txt`, `CMakePresets.json`, shared public headers, checked-in fixtures used by multiple tickets, `src/vulkan_scene_viewer.cpp`, and any running build/test outputs such as DLLs, PDBs, or executables.
+
 ## Test Selection
 
 Each ticket should run the narrowest meaningful suite first, then a broader suite before merge.
