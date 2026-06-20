@@ -1,0 +1,24 @@
+{
+  "movement": {
+    "player_run_speed_world_units_per_second": 37.7,
+    "player_sprint_speed_scale": 2.3,
+    "backpedal_speed_scale": 0.33333334,
+    "move_target_arrival_radius_world_units": 1.0,
+    "sparring_move_speed_world_units_per_second": 50.0,
+    "turn_speed_degrees_per_second": 240.0,
+    "arena_edge_inset_world_units": 5.0
+  },
+  "bindings": {
+    "close_viewer": ["ESCAPE"],
+    "camera_mode_toggle": ["TAB", "CAPS_LOCK"],
+    "player_move_left": ["A"],
+    "player_move_right": ["D"],
+    "player_move_forward": ["W"],
+    "player_move_backward": ["S"],
+    "player_sprint": ["LEFT_SHIFT", "RIGHT_SHIFT"],
+    "sparring_move_left": ["LEFT"],
+    "sparring_move_right": ["RIGHT"],
+    "sparring_move_forward": ["UP"],
+    "sparring_move_backward": ["DOWN"]
+  }
+}

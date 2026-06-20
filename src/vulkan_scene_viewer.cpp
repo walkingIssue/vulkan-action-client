@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -28,6 +29,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <unordered_map>
 #include <vector>
 
@@ -36,6 +38,7 @@
 #include <spdlog/spdlog.h>
 
 #include "combat/combat_simulation.hpp"
+#include "config/control_profile.hpp"
 #include "render/scene_geometry.hpp"
 #include "scene/scene_runtime.hpp"
 
@@ -58,6 +61,7 @@ constexpr bool kEnableValidationLayers = true;
 struct ViewerOptions
 {
     std::filesystem::path scenePath;
+    std::filesystem::path controlProfilePath;
     uint32_t frames = 0;
     bool orbitCamera = false;
 };
@@ -113,6 +117,21 @@ struct CameraView
     float worldRadius = 32.0f;
 };
 
+struct ResolvedControlBindings
+{
+    std::vector<int> closeViewer;
+    std::vector<int> cameraModeToggle;
+    std::vector<int> playerMoveLeft;
+    std::vector<int> playerMoveRight;
+    std::vector<int> playerMoveForward;
+    std::vector<int> playerMoveBackward;
+    std::vector<int> playerSprint;
+    std::vector<int> sparringMoveLeft;
+    std::vector<int> sparringMoveRight;
+    std::vector<int> sparringMoveForward;
+    std::vector<int> sparringMoveBackward;
+};
+
 std::vector<char> readFile(const std::filesystem::path &path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -131,11 +150,14 @@ ViewerOptions parseOptions(int argc, char **argv)
 {
     ViewerOptions options;
     options.scenePath = vac::defaultProjectRoot() / "config/scenes/bootstrap.scene.json";
+    options.controlProfilePath = vac::defaultControlProfilePath();
 
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg{argv[i]};
         if (arg == "--scene" && i + 1 < argc) {
             options.scenePath = argv[++i];
+        } else if (arg == "--control-profile" && i + 1 < argc) {
+            options.controlProfilePath = argv[++i];
         } else if (arg == "--frames" && i + 1 < argc) {
             options.frames = static_cast<uint32_t>(std::max(0, std::stoi(argv[++i])));
         } else if (arg == "--orbit-camera") {
@@ -146,6 +168,103 @@ ViewerOptions parseOptions(int argc, char **argv)
     }
 
     return options;
+}
+
+std::string normalizedKeyName(std::string_view name)
+{
+    std::string normalized;
+    normalized.reserve(name.size());
+    for (const char c : name) {
+        if (c == '-' || c == ' ') {
+            normalized.push_back('_');
+        } else {
+            normalized.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+        }
+    }
+    return normalized;
+}
+
+std::optional<int> glfwKeyCodeFromName(std::string_view name)
+{
+    const std::string key = normalizedKeyName(name);
+    if (key.size() == 1) {
+        const char c = key.front();
+        if (c >= 'A' && c <= 'Z') {
+            return GLFW_KEY_A + (c - 'A');
+        }
+        if (c >= '0' && c <= '9') {
+            return GLFW_KEY_0 + (c - '0');
+        }
+    }
+
+    static const std::unordered_map<std::string, int> kNamedKeys = {
+        {"ESC", GLFW_KEY_ESCAPE},
+        {"ESCAPE", GLFW_KEY_ESCAPE},
+        {"TAB", GLFW_KEY_TAB},
+        {"CAPS", GLFW_KEY_CAPS_LOCK},
+        {"CAPS_LOCK", GLFW_KEY_CAPS_LOCK},
+        {"LEFT_SHIFT", GLFW_KEY_LEFT_SHIFT},
+        {"RIGHT_SHIFT", GLFW_KEY_RIGHT_SHIFT},
+        {"SHIFT", GLFW_KEY_LEFT_SHIFT},
+        {"LEFT", GLFW_KEY_LEFT},
+        {"RIGHT", GLFW_KEY_RIGHT},
+        {"UP", GLFW_KEY_UP},
+        {"DOWN", GLFW_KEY_DOWN},
+        {"SPACE", GLFW_KEY_SPACE},
+        {"ENTER", GLFW_KEY_ENTER},
+        {"RETURN", GLFW_KEY_ENTER},
+        {"LEFT_CONTROL", GLFW_KEY_LEFT_CONTROL},
+        {"RIGHT_CONTROL", GLFW_KEY_RIGHT_CONTROL},
+        {"LEFT_ALT", GLFW_KEY_LEFT_ALT},
+        {"RIGHT_ALT", GLFW_KEY_RIGHT_ALT},
+    };
+
+    const auto it = kNamedKeys.find(key);
+    if (it == kNamedKeys.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
+std::vector<int> resolveKeyList(const std::vector<std::string> &names, std::string_view actionName)
+{
+    std::vector<int> keys;
+    keys.reserve(names.size());
+    for (const std::string &name : names) {
+        const std::optional<int> keyCode = glfwKeyCodeFromName(name);
+        if (!keyCode.has_value()) {
+            throw std::runtime_error(fmt::format("Unknown key '{}' in action '{}'", name, actionName));
+        }
+        keys.push_back(*keyCode);
+    }
+    return keys;
+}
+
+ResolvedControlBindings resolveControlBindings(const vac::ControlBindings &bindings)
+{
+    return {
+        resolveKeyList(bindings.closeViewer, "close_viewer"),
+        resolveKeyList(bindings.cameraModeToggle, "camera_mode_toggle"),
+        resolveKeyList(bindings.playerMoveLeft, "player_move_left"),
+        resolveKeyList(bindings.playerMoveRight, "player_move_right"),
+        resolveKeyList(bindings.playerMoveForward, "player_move_forward"),
+        resolveKeyList(bindings.playerMoveBackward, "player_move_backward"),
+        resolveKeyList(bindings.playerSprint, "player_sprint"),
+        resolveKeyList(bindings.sparringMoveLeft, "sparring_move_left"),
+        resolveKeyList(bindings.sparringMoveRight, "sparring_move_right"),
+        resolveKeyList(bindings.sparringMoveForward, "sparring_move_forward"),
+        resolveKeyList(bindings.sparringMoveBackward, "sparring_move_backward"),
+    };
+}
+
+std::optional<std::filesystem::file_time_type> fileWriteTime(const std::filesystem::path &path)
+{
+    std::error_code error;
+    const auto writeTime = std::filesystem::last_write_time(path, error);
+    if (error) {
+        return std::nullopt;
+    }
+    return writeTime;
 }
 
 VkVertexInputBindingDescription vertexBindingDescription()
@@ -172,6 +291,7 @@ public:
     explicit VulkanSceneViewer(ViewerOptions options)
         : m_options(std::move(options))
     {
+        loadInitialControlProfile();
         m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
         m_renderData = vac::buildSceneRenderData(m_scene);
         m_lineData = vac::buildSceneLineData(m_scene);
@@ -195,6 +315,9 @@ public:
 
 private:
     ViewerOptions m_options;
+    vac::ControlProfile m_controlProfile;
+    ResolvedControlBindings m_bindings;
+    std::optional<std::filesystem::file_time_type> m_controlProfileWriteTime;
     vac::SceneRuntime m_scene;
     vac::SceneRenderData m_renderData;
     vac::SceneDrawData m_lineData;
@@ -326,6 +449,35 @@ private:
         createSyncObjects();
     }
 
+    void loadInitialControlProfile()
+    {
+        m_controlProfile = vac::loadControlProfile(m_options.controlProfilePath);
+        m_bindings = resolveControlBindings(m_controlProfile.bindings);
+        m_controlProfileWriteTime = fileWriteTime(m_options.controlProfilePath);
+        spdlog::info("Loaded control profile '{}'", m_options.controlProfilePath.string());
+    }
+
+    void maybeReloadControlProfile()
+    {
+        const std::optional<std::filesystem::file_time_type> writeTime = fileWriteTime(m_options.controlProfilePath);
+        if (writeTime == m_controlProfileWriteTime) {
+            return;
+        }
+
+        try {
+            vac::ControlProfile nextProfile = vac::loadControlProfile(m_options.controlProfilePath);
+            ResolvedControlBindings nextBindings = resolveControlBindings(nextProfile.bindings);
+            m_controlProfile = std::move(nextProfile);
+            m_bindings = std::move(nextBindings);
+            m_controlProfileWriteTime = writeTime;
+            applyControlProfileToActors();
+            spdlog::info("Hot reloaded control profile '{}'", m_options.controlProfilePath.string());
+        } catch (const std::exception &error) {
+            m_controlProfileWriteTime = writeTime;
+            spdlog::warn("Keeping previous control profile; reload failed: {}", error.what());
+        }
+    }
+
     void mainLoop()
     {
         uint32_t frameCount = 0;
@@ -334,10 +486,11 @@ private:
 
         while (!glfwWindowShouldClose(m_window)) {
             glfwPollEvents();
+            maybeReloadControlProfile();
             handleCameraModeToggle();
             updateGroundCursor();
             handleClickToMoveInput();
-            if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            if (isAnyKeyPressed(m_bindings.closeViewer)) {
                 glfwSetWindowShouldClose(m_window, GLFW_TRUE);
             }
 
@@ -378,9 +531,16 @@ private:
             vac::combat::ActorState &actor = m_actorStates[i];
             actor.previousTransform = m_scene.instances[i].transform;
             actor.currentTransform = m_scene.instances[i].transform;
-            actor.moveSpeedWorldUnitsPerSecond = (m_playerIndex.has_value() && i == *m_playerIndex)
-                ? vac::combat::kPlayerMoveSpeedWorldUnitsPerSecond
-                : vac::combat::kSparringMoveSpeedWorldUnitsPerSecond;
+        }
+        applyControlProfileToActors();
+    }
+
+    void applyControlProfileToActors()
+    {
+        for (size_t i = 0; i < m_actorStates.size(); ++i) {
+            m_actorStates[i].moveSpeedWorldUnitsPerSecond = (m_playerIndex.has_value() && i == *m_playerIndex)
+                ? m_controlProfile.movement.playerRunSpeedWorldUnitsPerSecond
+                : m_controlProfile.movement.sparringMoveSpeedWorldUnitsPerSecond;
         }
     }
 
@@ -393,8 +553,7 @@ private:
 
     void handleCameraModeToggle()
     {
-        const bool toggleKeyDown = glfwGetKey(m_window, GLFW_KEY_TAB) == GLFW_PRESS ||
-                                   glfwGetKey(m_window, GLFW_KEY_CAPS_LOCK) == GLFW_PRESS;
+        const bool toggleKeyDown = isAnyKeyPressed(m_bindings.cameraModeToggle);
         if (toggleKeyDown && !m_cameraToggleWasDown) {
             setCameraSteeringEnabled(!m_cameraSteeringEnabled);
         }
@@ -552,7 +711,8 @@ private:
 
         const vac::combat::LocalMoveIntent playerIntent = readPlayerMoveAxes();
         const bool lockPlayerFacingToCamera = shouldLockPlayerFacingToCamera();
-        const bool playerSprinting = isPlayerSprintPressed();
+        const bool playerBackpedaling = playerIntent.axes.y < -0.0001f;
+        const bool playerSprinting = isPlayerSprintPressed() && !playerBackpedaling;
         const bool hasPlayerMoveInput = glm::dot(playerIntent.axes, playerIntent.axes) > 0.0001f;
         if (hasPlayerMoveInput && m_playerMoveTarget.has_value()) {
             m_playerMoveTarget.reset();
@@ -563,7 +723,10 @@ private:
             sparringYawDegrees = m_actorStates[*m_sparringIndex].currentTransform.rotationDegrees.y;
         }
         const vac::combat::LocalMoveIntent sparringIntent =
-            readKeyboardAxes(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN);
+            readKeyboardAxes(m_bindings.sparringMoveLeft,
+                             m_bindings.sparringMoveRight,
+                             m_bindings.sparringMoveForward,
+                             m_bindings.sparringMoveBackward);
         const vac::combat::ArenaLimits arena = arenaLimits();
 
         int ticks = 0;
@@ -577,13 +740,14 @@ private:
             if (m_playerIndex.has_value()) {
                 vac::combat::ActorState &player = m_actorStates[*m_playerIndex];
                 player.moveSpeedWorldUnitsPerSecond =
-                    vac::combat::kPlayerMoveSpeedWorldUnitsPerSecond *
-                    (playerSprinting ? vac::combat::kPlayerSprintSpeedScale : 1.0f);
+                    m_controlProfile.movement.playerRunSpeedWorldUnitsPerSecond *
+                    (playerSprinting ? m_controlProfile.movement.playerSprintSpeedScale : 1.0f);
                 if (!lockPlayerFacingToCamera && !hasPlayerMoveInput && m_playerMoveTarget.has_value()) {
                     moved |= vac::combat::applyMoveToWorldTarget(player,
                                                                  *m_playerMoveTarget,
                                                                  vac::combat::kFixedTickSeconds,
-                                                                 arena);
+                                                                 arena,
+                                                                 m_controlProfile.movement);
                     if (isAtMoveTarget(player, *m_playerMoveTarget)) {
                         m_playerMoveTarget.reset();
                         rebuildCursorLineVertices();
@@ -600,16 +764,20 @@ private:
                                                                       {movementYawDegrees},
                                                                       lockPlayerFacingToCamera,
                                                                       vac::combat::kFixedTickSeconds,
-                                                                      arena);
+                                                                      arena,
+                                                                      m_controlProfile.movement);
                 }
             }
 
             if (m_sparringIndex.has_value()) {
+                m_actorStates[*m_sparringIndex].moveSpeedWorldUnitsPerSecond =
+                    m_controlProfile.movement.sparringMoveSpeedWorldUnitsPerSecond;
                 moved |= vac::combat::applyCharacterLocomotion(m_actorStates[*m_sparringIndex],
                                                                sparringIntent,
                                                                {sparringYawDegrees},
                                                                vac::combat::kFixedTickSeconds,
-                                                               arena);
+                                                               arena,
+                                                               m_controlProfile.movement);
             }
 
             m_fixedAccumulatorSeconds -= vac::combat::kFixedTickSeconds;
@@ -634,7 +802,7 @@ private:
             if (instance.type == "floor") {
                 return {
                     instance.size * 0.5f,
-                    vac::combat::kArenaEdgeInsetWorldUnits,
+                    m_controlProfile.movement.arenaEdgeInsetWorldUnits,
                 };
             }
         }
@@ -669,21 +837,34 @@ private:
 
     bool isPlayerSprintPressed() const
     {
-        return glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-               glfwGetKey(m_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+        return isAnyKeyPressed(m_bindings.playerSprint);
     }
 
-    static bool isAtMoveTarget(const vac::combat::ActorState &actor, glm::vec2 target)
+    bool isAnyKeyPressed(const std::vector<int> &keys) const
+    {
+        for (const int key : keys) {
+            if (glfwGetKey(m_window, key) == GLFW_PRESS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isAtMoveTarget(const vac::combat::ActorState &actor, glm::vec2 target) const
     {
         const glm::vec2 current{actor.currentTransform.translation.x, actor.currentTransform.translation.z};
         const glm::vec2 delta = target - current;
-        const float radius = vac::combat::kMoveTargetArrivalRadiusWorldUnits;
+        const float radius = m_controlProfile.movement.moveTargetArrivalRadiusWorldUnits;
         return glm::dot(delta, delta) <= radius * radius;
     }
 
     vac::combat::LocalMoveIntent readPlayerMoveAxes() const
     {
-        glm::vec2 axes = readKeyboardAxes(GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_W, GLFW_KEY_S).axes;
+        glm::vec2 axes = readKeyboardAxes(m_bindings.playerMoveLeft,
+                                          m_bindings.playerMoveRight,
+                                          m_bindings.playerMoveForward,
+                                          m_bindings.playerMoveBackward)
+                             .axes;
 
 #ifdef _WIN32
         XINPUT_STATE state{};
@@ -700,19 +881,22 @@ private:
         return {normalizedMove(axes)};
     }
 
-    vac::combat::LocalMoveIntent readKeyboardAxes(int leftKey, int rightKey, int forwardKey, int backwardKey) const
+    vac::combat::LocalMoveIntent readKeyboardAxes(const std::vector<int> &leftKeys,
+                                                  const std::vector<int> &rightKeys,
+                                                  const std::vector<int> &forwardKeys,
+                                                  const std::vector<int> &backwardKeys) const
     {
         glm::vec2 axes{0.0f};
-        if (glfwGetKey(m_window, leftKey) == GLFW_PRESS) {
+        if (isAnyKeyPressed(leftKeys)) {
             axes.x -= 1.0f;
         }
-        if (glfwGetKey(m_window, rightKey) == GLFW_PRESS) {
+        if (isAnyKeyPressed(rightKeys)) {
             axes.x += 1.0f;
         }
-        if (glfwGetKey(m_window, forwardKey) == GLFW_PRESS) {
+        if (isAnyKeyPressed(forwardKeys)) {
             axes.y += 1.0f;
         }
-        if (glfwGetKey(m_window, backwardKey) == GLFW_PRESS) {
+        if (isAnyKeyPressed(backwardKeys)) {
             axes.y -= 1.0f;
         }
         return {normalizedMove(axes)};

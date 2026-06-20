@@ -15,6 +15,7 @@ find_package(Stb REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 add_library(scene_core
+    src/config/control_profile.cpp
     src/combat/combat_simulation.cpp
     src/render/scene_geometry.cpp
     src/scene/scene_runtime.cpp

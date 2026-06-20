@@ -50,21 +50,23 @@ The simulation can produce compact presentation commands each tick. The renderer
 
 ## Speed Model
 
-Movement speed belongs to combat state, not rendering. Inputs should be dimensionless intent such as "move northeast at full stick tilt"; the combat layer turns that into velocity using authored constants.
+Movement speed belongs to combat state, not rendering. Inputs should be dimensionless intent such as "move northeast at full stick tilt"; the combat layer turns that into velocity using authored tuning data.
 
 The intent should carry an explicit frame conversion. Raw controls are local axes; character facing, camera yaw, a clicked world target, or a lock-on target frame turns those inputs into world-space movement when needed. For this prototype, cursor mode uses the character's current facing frame and can issue click-to-move targets on the arena floor. Camera steering mode locks player facing and movement to camera yaw. That keeps "what the player meant" separate from "which way world +Z happens to be."
 
-For now the prototype uses world units per second:
+For now the prototype uses world units per second. The live values are loaded from `config/controls/player_control_profile.json` into `combat::MovementTuning` and hot-reloaded by the viewer:
 
-```cpp
-inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 29.0f;
-inline constexpr float kPlayerSprintSpeedScale = 1.6f;
-inline constexpr float kBackpedalSpeedScale = 1.0f / 3.0f;
-inline constexpr float kMoveTargetArrivalRadiusWorldUnits = 1.0f;
-inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
+```json
+{
+  "movement": {
+    "player_run_speed_world_units_per_second": 37.7,
+    "player_sprint_speed_scale": 2.3,
+    "backpedal_speed_scale": 0.33333334
+  }
+}
 ```
 
-The healthy long-term model is the same, but with normalized scale: once character assets and arenas agree on a meter-like unit, the constants can become meters per second. Presentation should not decide how far a dodge, walk, target step, or attack lunge moves. It should interpolate the previous and current combat transforms and render that state smoothly.
+The healthy long-term model is the same, but with normalized scale: once character assets and arenas agree on a meter-like unit, the tuning can become meters per second. Presentation should not decide how far a dodge, walk, target step, or attack lunge moves. It should interpolate the previous and current combat transforms and render that state smoothly.
 
 ## C++ Bias
 

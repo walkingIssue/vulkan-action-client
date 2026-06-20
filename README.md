@@ -72,13 +72,16 @@ Prototype controls:
 - Tab or Caps Lock toggles between cursor mode and camera steering mode.
 - In cursor mode, the mouse pointer is visible. Left click the projected ground square to rotate the player toward that point and move there.
 - In camera steering mode, mouse movement rotates the player-follow camera and player movement/facing locks to the camera direction.
-- Hold Shift to sprint at 1.6x normal movement speed.
+- Hold Shift to sprint at the configured sprint speed scale.
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Cursor mode uses character-facing movement and click-to-move world targets. Camera steering mode uses camera-relative movement and facing. Diagonal movement input is normalized so `A+W` and `D+W` do not move faster than straight movement. Backpedal moves at one-third of the active run/sprint speed.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Cursor mode uses character-facing movement and click-to-move world targets. Camera steering mode uses camera-relative movement and facing. Diagonal movement input is normalized so `A+W` and `D+W` do not move faster than straight movement. Backpedal moves at one-third of normal run speed and does not sprint.
+
+Movement tuning and key bindings live in `config/controls/player_control_profile.json`. The viewer hot-reloads that profile while running, so run speed, sprint scale, backpedal scale, arrival radius, arena inset, and keyboard bindings can be tuned without rebuilding.
 
 ## Architecture Notes
 
 See `docs/simulation-presentation-split.md` for the intended split between authoritative gameplay simulation and visual presentation.
 See `docs/input-pipeline.md` for the intended path from platform input to fixed-tick combat commands.
+See `docs/control-profile.md` for hot-reloaded movement tuning and key binding data.

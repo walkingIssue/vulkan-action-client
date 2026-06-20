@@ -48,7 +48,8 @@ bool applyCharacterLocomotion(ActorState &actor,
                               LocalMoveIntent intent,
                               ControlFrame idleControlFrame,
                               float deltaSeconds,
-                              ArenaLimits arena)
+                              ArenaLimits arena,
+                              const MovementTuning &tuning)
 {
     const glm::vec2 axes = normalizedDirection(intent.axes);
     const float turnAxis = axes.x;
@@ -63,7 +64,7 @@ bool applyCharacterLocomotion(ActorState &actor,
     Transform &transform = actor.currentTransform;
 
     if (wantsForwardMotion) {
-        transform.rotationDegrees.y += turnAxis * kTurnSpeedDegreesPerSecond * deltaSeconds;
+        transform.rotationDegrees.y += turnAxis * tuning.turnSpeedDegreesPerSecond * deltaSeconds;
 
         const glm::vec2 direction = forwardFromYaw(transform.rotationDegrees.y) * forwardAxis;
         transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
@@ -85,7 +86,8 @@ bool applyFramedStrafeLocomotion(ActorState &actor,
                                  ControlFrame movementFrame,
                                  bool lockFacingToMovementFrame,
                                  float deltaSeconds,
-                                 ArenaLimits arena)
+                                 ArenaLimits arena,
+                                 const MovementTuning &tuning)
 {
     Transform &transform = actor.currentTransform;
     const glm::vec2 axes = normalizedDirection(intent.axes);
@@ -104,7 +106,7 @@ bool applyFramedStrafeLocomotion(ActorState &actor,
     const glm::vec2 direction = normalizedDirection(
         rightFromYaw(movementFrame.yawDegrees) * axes.x +
         forwardFromYaw(movementFrame.yawDegrees) * axes.y);
-    const float speedScale = wantsBackpedal ? kBackpedalSpeedScale : 1.0f;
+    const float speedScale = wantsBackpedal ? tuning.backpedalSpeedScale : 1.0f;
 
     transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * speedScale * deltaSeconds;
     transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * speedScale * deltaSeconds;
@@ -116,13 +118,13 @@ bool applyMoveToWorldTarget(ActorState &actor,
                             glm::vec2 target,
                             float deltaSeconds,
                             ArenaLimits arena,
-                            float arrivalRadius)
+                            const MovementTuning &tuning)
 {
     Transform &transform = actor.currentTransform;
     const glm::vec2 current{transform.translation.x, transform.translation.z};
     const glm::vec2 toTarget = target - current;
     const float distance = std::sqrt(glm::dot(toTarget, toTarget));
-    if (distance <= arrivalRadius) {
+    if (distance <= tuning.moveTargetArrivalRadiusWorldUnits) {
         return false;
     }
 

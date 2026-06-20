@@ -8,13 +8,19 @@ namespace vac::combat
 {
 inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
 inline constexpr int kMaxCatchUpTicksPerFrame = 5;
-inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 29.0f;
-inline constexpr float kPlayerSprintSpeedScale = 1.6f;
-inline constexpr float kBackpedalSpeedScale = 1.0f / 3.0f;
-inline constexpr float kMoveTargetArrivalRadiusWorldUnits = 1.0f;
-inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;
-inline constexpr float kTurnSpeedDegreesPerSecond = 240.0f;
-inline constexpr float kArenaEdgeInsetWorldUnits = 5.0f;
+
+struct MovementTuning
+{
+    float playerRunSpeedWorldUnitsPerSecond = 37.7f;
+    float playerSprintSpeedScale = 2.3f;
+    float backpedalSpeedScale = 1.0f / 3.0f;
+    float moveTargetArrivalRadiusWorldUnits = 1.0f;
+    float sparringMoveSpeedWorldUnitsPerSecond = 50.0f;
+    float turnSpeedDegreesPerSecond = 240.0f;
+    float arenaEdgeInsetWorldUnits = 5.0f;
+};
+
+inline constexpr MovementTuning kDefaultMovementTuning{};
 
 struct LocalMoveIntent
 {
@@ -29,14 +35,14 @@ struct ControlFrame
 struct ArenaLimits
 {
     glm::vec2 halfExtents{200.0f};
-    float edgeInset = kArenaEdgeInsetWorldUnits;
+    float edgeInset = kDefaultMovementTuning.arenaEdgeInsetWorldUnits;
 };
 
 struct ActorState
 {
     Transform previousTransform;
     Transform currentTransform;
-    float moveSpeedWorldUnitsPerSecond = kPlayerMoveSpeedWorldUnitsPerSecond;
+    float moveSpeedWorldUnitsPerSecond = kDefaultMovementTuning.playerRunSpeedWorldUnitsPerSecond;
 };
 
 void beginTick(ActorState &actor);
@@ -44,17 +50,19 @@ bool applyCharacterLocomotion(ActorState &actor,
                               LocalMoveIntent intent,
                               ControlFrame idleControlFrame,
                               float deltaSeconds,
-                              ArenaLimits arena);
+                              ArenaLimits arena,
+                              const MovementTuning &tuning = kDefaultMovementTuning);
 bool applyFramedStrafeLocomotion(ActorState &actor,
                                  LocalMoveIntent intent,
                                  ControlFrame movementFrame,
                                  bool lockFacingToMovementFrame,
                                  float deltaSeconds,
-                                 ArenaLimits arena);
+                                 ArenaLimits arena,
+                                 const MovementTuning &tuning = kDefaultMovementTuning);
 bool applyMoveToWorldTarget(ActorState &actor,
                             glm::vec2 target,
                             float deltaSeconds,
                             ArenaLimits arena,
-                            float arrivalRadius = kMoveTargetArrivalRadiusWorldUnits);
+                            const MovementTuning &tuning = kDefaultMovementTuning);
 Transform interpolate(const ActorState &actor, float alpha);
 } // namespace vac::combat
