@@ -1,6 +1,6 @@
 # RM1-002: Compiled Network E2E Runner
 
-Status: planned
+Status: ready for merge
 Branch: mitigation01/rm1-002-compiled-network-e2e
 Start commit: `9f06853`
 Source plan: docs/sprint-01-risk-mitigation-plan.md
@@ -88,6 +88,7 @@ Ownership boundaries:
 
 - UDP loopback timing can be flaky if the runner relies on fixed sleeps only; use deadlines and drain loops.
 - Reusing a fixed port can collide with a manually running relay; support `--port` for debugging and use an uncommon default.
+- Client-observed disconnect events are timing-sensitive during teardown, so the hard gate uses relay-emitted disconnect events plus final relay drain while still reporting per-client observations.
 - `SnapshotClient` sends disconnect packets in its destructor, so client lifetime/shutdown order must be explicit.
 - Keep CMake edits focused to the new runner target and `network_e2e` test command.
 - If RM1-003 merges while this branch is active, rebase before final verification.
@@ -95,11 +96,24 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after RM1-001 merged and Mia released RM1-002.
+- 2026-06-20: Added compiled `network_e2e_runner`, replaced the canonical CTest command, and kept the old PowerShell script as an optional manual helper.
+- 2026-06-20: Focused, preset, full debug, negative CLI, and MSVC runtime-dialog checks passed. Final merge waited for Vera's RM1-003 merge window to close.
+- 2026-06-20: Rebasing onto `a8b932d Merge RM1-003 cross-asset validation` was clean; focused, network, e2e, full debug, and negative CLI checks passed again.
 
 ## Verification Results
 
-Pending.
+- After rebasing onto `a8b932d`, `cmake --build --preset msvc-debug --target network_e2e_runner` passed.
+- `ctest --test-dir build/msvc-debug -R "network_e2e" --output-on-failure` passed: 1/1.
+- `ctest --preset msvc-debug-network --output-on-failure` passed: 4/4.
+- `ctest --preset msvc-debug-e2e --output-on-failure` passed: 1/1.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug --output-on-failure` passed: 26/26.
+- `network_e2e_runner --client-count 1 --result-file ... --headless` returned exit 1 and wrote a structured `process_error` diagnostic.
+- `network_e2e_runner --unknown-option --result-file ... --headless` returned exit 1 and wrote a structured `process_error` diagnostic.
+- Generated `build/msvc-debug/CTestTestfile.cmake` registers `network_e2e` as a direct `network_e2e_runner.exe` command and no longer invokes PowerShell for that test.
+- MSVC runtime/assertion dialog check found no matching visible windows.
 
 ## Final Commits
 
-Pending.
+- `d6d2a20` Add compiled network E2E runner
+- `2a100cc` Stabilize network E2E disconnect oracle

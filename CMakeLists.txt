@@ -635,11 +635,22 @@ if(BUILD_TESTING)
         network_core
     )
 
+    add_executable(network_e2e_runner
+        tests/network_e2e_runner.cpp
+    )
+
+    target_compile_features(network_e2e_runner PRIVATE cxx_std_20)
+
+    target_link_libraries(network_e2e_runner PRIVATE
+        network_core
+        host_core
+    )
+
     add_test(
         NAME network_e2e
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass
-                -File "${CMAKE_CURRENT_SOURCE_DIR}/tools/test-network-e2e.ps1"
-                -BuildDir "$<TARGET_FILE_DIR:network_e2e_client>"
+        COMMAND network_e2e_runner
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/network_e2e_result.json"
+                --headless
     )
     set_tests_properties(network_e2e PROPERTIES
         TIMEOUT 30
