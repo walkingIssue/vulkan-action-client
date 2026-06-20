@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: mitigation01/rm1-002-compiled-network-e2e
-Start commit: pending
+Start commit: `9f06853`
 Source plan: docs/sprint-01-risk-mitigation-plan.md
 Source result docs:
 - docs/tickets/SP1-001-cmake-ctest-spine_result.md
