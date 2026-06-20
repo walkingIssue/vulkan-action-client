@@ -2,7 +2,7 @@
 
 Status: in progress
 Branch: sprint02/sp2-004-scenario-playback-controls
-Start commit: pending docs-only start commit from base `b08f4ff`
+Start commit: `79cca54`
 Source plan: `docs/sprint-02-implementation-plan.md`
 Source dispatch: `C:\Users\Bartek\Documents\Playground\vulkan-agent-comms\claims\SP2-004.md`
 Required base: `origin/main` `b08f4ffa0c6d3bcfe35093d25e693a2fb4418a00`
@@ -94,10 +94,12 @@ Ownership boundaries:
 
 - 2026-06-20: Planned by `SP2-PLAN`.
 - 2026-06-20: Aetoun dispatched by Mia from `origin/main` `b08f4ff`; posted ACK/start evidence with tracked-clean status and untracked `assets/` only.
+- 2026-06-20: Published start commit `79cca54` to `main`, created/pushed feature branch, and added the first visual lab playback/evidence slice.
 
 ## Verification Results
 
-Fill this before merging.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target visual_lab_tests` passed.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R "visual_lab" --output-on-failure` passed: 3/3.
 
 ## Final Commits
 

@@ -20,6 +20,11 @@ void expect(bool condition, std::string_view message)
     }
 }
 
+bool containsDiagnostic(const std::vector<std::string> &diagnostics, std::string_view expected)
+{
+    return std::find(diagnostics.begin(), diagnostics.end(), expected) != diagnostics.end();
+}
+
 void defaultLabBuildsSprintDebugScene()
 {
     const vac::visual_lab::VisualLabScene scene =
@@ -73,6 +78,64 @@ void summaryDiagnosticsAreStructured()
            "summary includes debug line count");
 }
 
+void playbackModelClampsStepsAndResets()
+{
+    vac::visual_lab::VisualLabPlaybackState state = vac::visual_lab::makePlaybackState(36);
+    expect(state.currentTick == 0, "playback starts at tick zero");
+    expect(state.durationTicks == 36, "playback stores duration");
+    expect(state.paused && !state.running, "playback starts paused");
+
+    state = vac::visual_lab::setPlaybackPaused(state, false);
+    expect(!state.paused && state.running, "playback can run");
+
+    state = vac::visual_lab::stepPlayback(state, 5);
+    expect(state.currentTick == 5, "playback steps by requested ticks");
+    expect(state.paused && !state.running, "manual step pauses playback");
+
+    state = vac::visual_lab::seekPlayback(state, 500);
+    expect(state.currentTick == 36, "playback seek clamps to duration");
+
+    state = vac::visual_lab::stepPlayback(state);
+    expect(state.currentTick == 36, "playback step clamps at duration");
+
+    state = vac::visual_lab::resetPlayback(state);
+    expect(state.currentTick == 0, "playback reset returns to tick zero");
+    expect(state.paused && !state.running, "playback reset pauses");
+
+    const std::vector<std::string> diagnostics = vac::visual_lab::playbackDiagnostics(state);
+    expect(containsDiagnostic(diagnostics, "visualLabPlayback=true"), "playback diagnostics enabled");
+    expect(containsDiagnostic(diagnostics, "playbackCanStepForward=true"), "playback diagnostics expose step bound");
+}
+
+void scenarioEvidenceSummarizesCombatTraceFields()
+{
+    const std::filesystem::path scenarioPath =
+        vac::defaultProjectRoot() / "tests/fixtures/scenarios/sword_light_hits_idle_target.scenario.json";
+    const vac::combat::ScenarioRunResult result =
+        vac::combat::runCombatScenario(vac::combat::loadCombatScenario(scenarioPath));
+    const vac::visual_lab::VisualLabScenarioEvidenceSummary summary =
+        vac::visual_lab::summarizeScenarioEvidence(result.trace);
+
+    expect(summary.eventCount == 13, "scenario evidence event count");
+    expect(summary.firstEventTick == 0, "scenario evidence first tick");
+    expect(summary.lastEventTick == 33, "scenario evidence last tick");
+    expect(summary.effectEventCount == 1, "scenario evidence effect event count");
+    expect(summary.hitEventCount == 1, "scenario evidence hit event count");
+    expect(summary.blockedHitEventCount == 0, "scenario evidence blocked hit count");
+    expect(summary.totalDamage == 12, "scenario evidence total damage");
+    expect(summary.maxDamage == 12, "scenario evidence max damage");
+    expect(summary.lowestRemainingHealth == 88, "scenario evidence remaining health");
+    expect(summary.reactionMoves.size() == 1 && summary.reactionMoves.front() == "move.hit_reaction",
+           "scenario evidence reaction move");
+
+    const std::vector<std::string> diagnostics = vac::visual_lab::scenarioEvidenceDiagnostics(summary);
+    expect(containsDiagnostic(diagnostics, "scenarioEvidenceEventCount=13"), "evidence diagnostics event count");
+    expect(containsDiagnostic(diagnostics, "scenarioEvidenceTotalDamage=12"), "evidence diagnostics damage");
+    expect(containsDiagnostic(diagnostics, "scenarioEvidenceHasReaction=true"), "evidence diagnostics reaction flag");
+    expect(containsDiagnostic(diagnostics, "scenarioEvidenceReactionMoves=move.hit_reaction"),
+           "evidence diagnostics reaction list");
+}
+
 void scenarioLabBuildsScenarioDiagnostics()
 {
     const std::filesystem::path scenarioPath =
@@ -108,6 +171,26 @@ void scenarioLabBuildsScenarioDiagnostics()
                      scene.resultDiagnostics.end(),
                      "scenarioFinalStateHash=0xf73237aa3baea830") != scene.resultDiagnostics.end(),
            "scenario diagnostics include final state hash");
+
+    expect(scene.playback.durationTicks == 36, "scenario visual lab playback duration");
+    expect(scene.playback.currentTick == 0, "scenario visual lab playback starts at zero");
+    expect(scene.playback.paused && !scene.playback.running, "scenario visual lab playback starts paused");
+    expect(scene.scenarioEvidence.eventCount == 13, "scenario visual lab evidence count");
+    expect(scene.scenarioEvidence.totalDamage == 12, "scenario visual lab evidence damage");
+    expect(containsDiagnostic(scene.resultDiagnostics, "visualLabPlayback=true"),
+           "scenario diagnostics include playback marker");
+    expect(containsDiagnostic(scene.resultDiagnostics, "playbackPreviewStepTick=1"),
+           "scenario diagnostics include preview step");
+    expect(containsDiagnostic(scene.resultDiagnostics, "playbackPreviewResetTick=0"),
+           "scenario diagnostics include preview reset");
+    expect(containsDiagnostic(scene.resultDiagnostics, "playbackPreviewSeekEndTick=36"),
+           "scenario diagnostics include bounded seek");
+    expect(containsDiagnostic(scene.resultDiagnostics, "scenarioEvidenceEventCount=13"),
+           "scenario diagnostics include evidence event count");
+    expect(containsDiagnostic(scene.resultDiagnostics, "scenarioEvidenceTotalDamage=12"),
+           "scenario diagnostics include damage summary");
+    expect(containsDiagnostic(scene.resultDiagnostics, "scenarioEvidenceReactionMoves=move.hit_reaction"),
+           "scenario diagnostics include reaction summary");
 }
 } // namespace
 
@@ -117,6 +200,8 @@ int main()
         defaultLabBuildsSprintDebugScene();
         missingMapReportsDiagnostic();
         summaryDiagnosticsAreStructured();
+        playbackModelClampsStepsAndResets();
+        scenarioEvidenceSummarizesCombatTraceFields();
         scenarioLabBuildsScenarioDiagnostics();
     } catch (const std::exception &error) {
         ++g_failures;
