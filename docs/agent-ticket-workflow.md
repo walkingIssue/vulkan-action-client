@@ -175,6 +175,50 @@ Fill this after implementation.
 - Use `apply_patch` for manual edits.
 - Use `--no-gpg-sign` on commits.
 
+## Remote Push Policy
+
+Agents should push durable milestones to GitHub so parallel work and handoffs do not depend on one local checkout.
+
+Use the canonical repository URL:
+
+```text
+git@github.com:walkingIssue/vulkan-action-client.git
+```
+
+Push at these points:
+
+- After the start commit is created and the feature branch is created.
+- After any significant chunk of code changes, especially a logical slice that passes targeted tests.
+- After updating verification/result documents near the end of a ticket.
+- After merging a feature branch back to `main`.
+
+If no `origin` remote is configured, push directly to the canonical URL:
+
+```powershell
+git push git@github.com:walkingIssue/vulkan-action-client.git HEAD:refs/heads/sprint01/sp1-###-short-slug
+git push git@github.com:walkingIssue/vulkan-action-client.git main:refs/heads/main
+```
+
+On this Windows machine, GitHub SSH may need Windows OpenSSH and local Git LFS on `PATH`:
+
+```powershell
+$env:GIT_SSH_COMMAND = 'C:/Windows/System32/OpenSSH/ssh.exe'
+$env:PATH = 'C:\Users\Bartek\Documents\Playground\tools\git-lfs-3.7.1\git-lfs-3.7.1;' + $env:PATH
+```
+
+Do not read password files or copy secrets into commands unless the user explicitly confirms there is no key-based path. Prefer the configured SSH key and `--no-gpg-sign`.
+
+## Multi-Agent Local Coordination
+
+Multiple agents may be running on the same machine from sibling copies of this repository. Assume other agents may build, test, or push nearby branches at the same time.
+
+- Work in the checkout assigned to you and avoid touching sibling worktrees unless the user asks.
+- Expect occasional fights over build outputs, locked executables, PDBs, DLLs, or test artifacts.
+- If a build or copy fails because a file is locked, wait briefly, inspect the owning process when useful, and retry before declaring the failure mysterious.
+- Do not kill another agent's process unless the user explicitly asks or it is clearly orphaned and blocking the requested work.
+- Pull or inspect remote refs before major merges when another agent may have pushed.
+- Patience is key; a transient Windows file lock is usually coordination noise, not a design signal.
+
 ## Test Selection
 
 Each ticket should run the narrowest meaningful suite first, then a broader suite before merge.
