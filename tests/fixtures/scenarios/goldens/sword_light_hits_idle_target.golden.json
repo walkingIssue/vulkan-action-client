@@ -52,12 +52,17 @@
     },
     {
       "actor": 1,
+      "damage": 12,
+      "hitstopTicks": 1,
       "kind": "hit",
       "label": "blade_arc",
       "move": "move.light_attack",
       "moveTick": 9,
+      "reactionMove": "move.hit_reaction",
       "sequence": 6,
+      "stunTicks": 3,
       "target": 2,
+      "targetRemainingHealth": 88,
       "tick": 9
     },
     {
@@ -71,17 +76,67 @@
       "tick": 13
     },
     {
+      "actor": 2,
+      "kind": "phase_entered",
+      "label": "startup",
+      "move": "move.hit_reaction",
+      "moveTick": 0,
+      "sequence": 8,
+      "target": 0,
+      "tick": 13
+    },
+    {
+      "actor": 2,
+      "kind": "authored_event",
+      "label": "debug_event:hit_reaction_start",
+      "move": "move.hit_reaction",
+      "moveTick": 0,
+      "sequence": 9,
+      "target": 0,
+      "tick": 13
+    },
+    {
+      "actor": 2,
+      "kind": "phase_entered",
+      "label": "active",
+      "move": "move.hit_reaction",
+      "moveTick": 1,
+      "sequence": 10,
+      "target": 0,
+      "tick": 14
+    },
+    {
+      "actor": 2,
+      "kind": "phase_entered",
+      "label": "recovery",
+      "move": "move.hit_reaction",
+      "moveTick": 16,
+      "sequence": 11,
+      "target": 0,
+      "tick": 29
+    },
+    {
+      "actor": 2,
+      "kind": "move_completed",
+      "label": "move.hit_reaction",
+      "move": "move.hit_reaction",
+      "moveTick": 20,
+      "sequence": 12,
+      "target": 0,
+      "tick": 32
+    },
+    {
       "actor": 1,
       "kind": "move_completed",
       "label": "move.light_attack",
       "move": "move.light_attack",
       "moveTick": 34,
-      "sequence": 8,
+      "sequence": 13,
       "target": 0,
       "tick": 33
     }
   ],
-  "finalStateHash": "0x899156866903d60e",
+  "finalStateHash": "0xf73237aa3baea830",
   "scenarioId": "scenario.sword_light_hits_idle_target",
   "seed": 1001,
   "ticksRun": 36

@@ -47,6 +47,17 @@ glm::vec3 readVec3(const json &value, glm::vec3 fallback)
 
 json vec3ToJson(glm::vec3 value) { return json::array({value.x, value.y, value.z}); }
 
+ScenarioCombatBridge readCombatBridge(const json &value)
+{
+    ScenarioCombatBridge bridge;
+    if (!value.is_object()) {
+        return bridge;
+    }
+    bridge.maxHealth = value.value("maxHealth", bridge.maxHealth);
+    bridge.health = value.value("health", bridge.maxHealth);
+    return bridge;
+}
+
 CombatVolumeKind volumeKindFromString(const std::string &value)
 {
     if (value == "sphere") {
@@ -158,6 +169,10 @@ std::vector<ScenarioDiagnostic> validateScenario(const CombatScenario &scenario)
         }
         if (actor.team.empty()) {
             addDiagnostic(diagnostics, "missing_actor_team", field + "/team", "Actor team is required");
+        }
+        if (actor.combatBridge.maxHealth == 0 || actor.combatBridge.health > actor.combatBridge.maxHealth) {
+            addDiagnostic(diagnostics, "invalid_combat_bridge", field + "/combatBridge",
+                          "Scenario combat bridge health must be positive and not exceed maxHealth");
         }
     }
 
@@ -546,15 +561,22 @@ std::vector<CombatTickContext> collectCollisionContexts(
                 const bool invulnerable = actorIsInvulnerable(runtime, scenarioActor.id);
                 if (geometricHit && invulnerable) {
                     blockedHitThisTick = true;
-                    pendingTraceEvents.push_back({0,
-                                                  runtime.tick,
-                                                  "hit_blocked",
-                                                  actorState.actorId.value,
-                                                  scenarioActor.id.value,
-                                                  move->compiled.logicalId,
-                                                  actorState.moveTick,
-                                                  "invulnerable:" +
-                                                      move->compiled.internTable.trackIds[hitbox.trackId - 1]});
+                    CombatHitEffectResult blockedEffect;
+                    if (const CombatActorState *blockedActor = findCombatActor(runtime, scenarioActor.id)) {
+                        blockedEffect.remainingHealth = blockedActor->currentHealth;
+                    }
+                    ScenarioTraceEvent blockedEvent;
+                    blockedEvent.tick = runtime.tick;
+                    blockedEvent.kind = "hit_blocked";
+                    blockedEvent.actorId = actorState.actorId.value;
+                    blockedEvent.targetId = scenarioActor.id.value;
+                    blockedEvent.move = move->compiled.logicalId;
+                    blockedEvent.moveTick = actorState.moveTick;
+                    blockedEvent.label = "invulnerable:" + move->compiled.internTable.trackIds[hitbox.trackId - 1];
+                    blockedEvent.hasEffect = true;
+                    blockedEvent.damage = 0;
+                    blockedEvent.targetRemainingHealth = blockedEffect.remainingHealth;
+                    pendingTraceEvents.push_back(std::move(blockedEvent));
                 }
 
                 targets.push_back({
@@ -581,14 +603,25 @@ std::vector<CombatTickContext> collectCollisionContexts(
             for (const CombatHitCandidate &candidate : filtered) {
                 landedHitThisTick = true;
                 const std::string &trackName = move->compiled.internTable.trackIds[hitbox.trackId - 1];
-                pendingTraceEvents.push_back({0,
-                                              runtime.tick,
-                                              "hit",
-                                              actorState.actorId.value,
-                                              candidate.victimId,
-                                              move->compiled.logicalId,
-                                              actorState.moveTick,
-                                              trackName});
+                CombatHitEffectResult effect;
+                if (CombatActorState *victim = findCombatActor(runtime, {candidate.victimId})) {
+                    effect = applyHitEffect(runtime, *victim, hitbox);
+                }
+                ScenarioTraceEvent hitEvent;
+                hitEvent.tick = runtime.tick;
+                hitEvent.kind = "hit";
+                hitEvent.actorId = actorState.actorId.value;
+                hitEvent.targetId = candidate.victimId;
+                hitEvent.move = move->compiled.logicalId;
+                hitEvent.moveTick = actorState.moveTick;
+                hitEvent.label = trackName;
+                hitEvent.hasEffect = true;
+                hitEvent.damage = effect.damageApplied;
+                hitEvent.targetRemainingHealth = effect.remainingHealth;
+                hitEvent.reactionMove = effect.reactionStarted ? effect.reactionMove : std::string{};
+                hitEvent.hitstopTicks = effect.hitstopTicks;
+                hitEvent.stunTicks = effect.stunTicks;
+                pendingTraceEvents.push_back(std::move(hitEvent));
             }
         }
 
@@ -638,6 +671,8 @@ uint64_t finalStateHash(const simulation::RuntimeWorld &world, const CombatRunti
         appendUint32(hash, actor->activeMoveId);
         appendUint32(hash, actor->moveInstanceSequence);
         appendUint32(hash, actor->moveTick);
+        appendUint32(hash, actor->maxHealth);
+        appendUint32(hash, actor->currentHealth);
         appendUint32(hash, actor->hitstopRemaining);
         appendUint32(hash, actor->stunRemaining);
         appendUint32(hash, static_cast<uint32_t>(actor->hitRegistry.size()));
@@ -665,6 +700,13 @@ ScenarioTrace traceFromJson(const json &document)
             item.value("move", ""),
             item.value("moveTick", 0u),
             item.value("label", ""),
+            item.contains("damage") || item.contains("targetRemainingHealth") || item.contains("reactionMove") ||
+                item.contains("hitstopTicks") || item.contains("stunTicks"),
+            item.value("damage", 0u),
+            item.value("targetRemainingHealth", 0u),
+            item.value("reactionMove", ""),
+            static_cast<uint16_t>(item.value("hitstopTicks", 0u)),
+            static_cast<uint16_t>(item.value("stunTicks", 0u)),
         });
     }
     return trace;
@@ -764,6 +806,7 @@ CombatScenario combatScenarioFromJson(const nlohmann::json &document, std::files
             actor.hurtbox.size = readVec3(hurtbox.value("size", json::array()), actor.hurtbox.size);
             actor.hurtbox.offset = readVec3(hurtbox.value("offset", json::array()), actor.hurtbox.offset);
         }
+        actor.combatBridge = readCombatBridge(item.value("combatBridge", json::object()));
         scenario.actors.push_back(std::move(actor));
     }
     for (const json &item : document.value("inputs", json::array())) {
@@ -818,11 +861,19 @@ simulation::RuntimeWorld makeScenarioRuntimeWorld(const CombatScenario &scenario
 
 nlohmann::json toJson(const ScenarioTraceEvent &event)
 {
-    return {
+    json document = {
         {"actor", event.actorId},       {"kind", event.kind},       {"label", event.label},
         {"move", event.move},           {"moveTick", event.moveTick}, {"sequence", event.sequence},
         {"target", event.targetId},     {"tick", event.tick},
     };
+    if (event.hasEffect) {
+        document["damage"] = event.damage;
+        document["hitstopTicks"] = event.hitstopTicks;
+        document["reactionMove"] = event.reactionMove;
+        document["stunTicks"] = event.stunTicks;
+        document["targetRemainingHealth"] = event.targetRemainingHealth;
+    }
+    return document;
 }
 
 nlohmann::json toJson(const ScenarioTrace &trace)
@@ -976,6 +1027,11 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
 
         simulation::RuntimeWorld world = makeRuntimeWorld(result.scenario, compiledWorld.world);
         CombatRuntime runtime = createCombatRuntime(CombatMoveLibrary{std::move(compiledMoves)}, world.actors);
+        for (const ScenarioActor &scenarioActor : result.scenario.actors) {
+            if (CombatActorState *actor = findCombatActor(runtime, scenarioActor.id)) {
+                setActorHealth(*actor, scenarioActor.combatBridge.health, scenarioActor.combatBridge.maxHealth);
+            }
+        }
 
         for (uint32_t tick = 0; tick < result.scenario.durationTicks; ++tick) {
             const std::vector<simulation::InputFrame> inputs = inputsForTick(result.scenario, tick);
@@ -984,9 +1040,9 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
                 collectCollisionContexts(runtime, result.scenario, world, animations, pendingCollisionEvents);
             const CombatTickResult combatResult = advanceCombatTick(runtime, inputs, contexts);
             appendCombatEvents(result.trace, combatResult, runtime);
-            for (const ScenarioTraceEvent &event : pendingCollisionEvents) {
-                appendTraceEvent(result.trace, event.tick, event.kind, event.actorId, event.targetId, event.move,
-                                 event.moveTick, event.label);
+            for (ScenarioTraceEvent event : pendingCollisionEvents) {
+                event.sequence = static_cast<uint32_t>(result.trace.events.size() + 1);
+                result.trace.events.push_back(std::move(event));
             }
             simulation::advanceFixedTick(world, inputs);
         }

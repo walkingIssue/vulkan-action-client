@@ -36,6 +36,12 @@ struct ScenarioHurtbox
     glm::vec3 offset{0.0f, 1.0f, 0.0f};
 };
 
+struct ScenarioCombatBridge
+{
+    uint32_t maxHealth = 100;
+    uint32_t health = 100;
+};
+
 struct ScenarioActor
 {
     simulation::RuntimeActorId id;
@@ -44,6 +50,7 @@ struct ScenarioActor
     std::optional<glm::vec3> translation;
     std::optional<float> yawDegrees;
     ScenarioHurtbox hurtbox;
+    ScenarioCombatBridge combatBridge;
 };
 
 struct ScenarioInputCommand
@@ -98,6 +105,12 @@ struct ScenarioTraceEvent
     std::string move;
     uint32_t moveTick = 0;
     std::string label;
+    bool hasEffect = false;
+    uint32_t damage = 0;
+    uint32_t targetRemainingHealth = 0;
+    std::string reactionMove;
+    uint16_t hitstopTicks = 0;
+    uint16_t stunTicks = 0;
 };
 
 struct ScenarioTrace

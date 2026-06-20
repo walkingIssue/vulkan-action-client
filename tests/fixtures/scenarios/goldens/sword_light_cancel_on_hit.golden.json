@@ -52,12 +52,17 @@
     },
     {
       "actor": 1,
+      "damage": 12,
+      "hitstopTicks": 1,
       "kind": "hit",
       "label": "blade_arc",
       "move": "move.light_attack",
       "moveTick": 9,
+      "reactionMove": "move.hit_reaction",
       "sequence": 6,
+      "stunTicks": 3,
       "target": 2,
+      "targetRemainingHealth": 88,
       "tick": 9
     },
     {
@@ -91,17 +96,47 @@
       "tick": 13
     },
     {
+      "actor": 2,
+      "kind": "phase_entered",
+      "label": "startup",
+      "move": "move.hit_reaction",
+      "moveTick": 0,
+      "sequence": 10,
+      "target": 0,
+      "tick": 13
+    },
+    {
+      "actor": 2,
+      "kind": "authored_event",
+      "label": "debug_event:hit_reaction_start",
+      "move": "move.hit_reaction",
+      "moveTick": 0,
+      "sequence": 11,
+      "target": 0,
+      "tick": 13
+    },
+    {
+      "actor": 2,
+      "kind": "phase_entered",
+      "label": "active",
+      "move": "move.hit_reaction",
+      "moveTick": 1,
+      "sequence": 12,
+      "target": 0,
+      "tick": 14
+    },
+    {
       "actor": 1,
       "kind": "authored_event",
       "label": "animation_event:sword_followup_start",
       "move": "move.light_followup",
       "moveTick": 2,
-      "sequence": 10,
+      "sequence": 13,
       "target": 0,
       "tick": 15
     }
   ],
-  "finalStateHash": "0x94146d73ad955e09",
+  "finalStateHash": "0x41cfd0b50f524f91",
   "scenarioId": "scenario.sword_light_cancel_on_hit",
   "seed": 1003,
   "ticksRun": 18

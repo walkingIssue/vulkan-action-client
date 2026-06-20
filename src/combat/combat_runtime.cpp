@@ -67,6 +67,15 @@ void startMove(CombatRuntime &runtime, CombatTickResult &result, CombatActorStat
     emitEvent(runtime, result, actor, CombatEventKind::moveStarted, move, move.compiled.logicalId);
 }
 
+void startMoveWithoutEvent(CombatRuntime &runtime, CombatActorState &actor, const RuntimeMove &move)
+{
+    actor.activeMoveId = move.runtimeMoveId;
+    actor.moveTick = 0;
+    actor.moveInstanceSequence = runtime.nextMoveInstanceSequence++;
+    actor.stateTags.clear();
+    actor.hitRegistry.clear();
+}
+
 void emitMoveTickEvents(CombatRuntime &runtime, CombatTickResult &result, CombatActorState &actor,
                         const RuntimeMove &move)
 {
@@ -294,4 +303,38 @@ CombatTickResult advanceCombatTick(CombatRuntime &runtime, const std::vector<sim
 void applyHitstop(CombatActorState &actor, uint16_t ticks) { actor.hitstopRemaining = ticks; }
 
 void applyStun(CombatActorState &actor, uint16_t ticks) { actor.stunRemaining = ticks; }
+
+void setActorHealth(CombatActorState &actor, uint32_t currentHealth, uint32_t maxHealth)
+{
+    actor.maxHealth = maxHealth == 0 ? currentHealth : maxHealth;
+    actor.currentHealth = std::min(currentHealth, actor.maxHealth);
+}
+
+CombatHitEffectResult applyHitEffect(CombatRuntime &runtime, CombatActorState &victim,
+                                     const content::CompiledHitboxTrack &hitbox)
+{
+    CombatHitEffectResult result;
+    result.damageApplied = std::min(hitbox.damage, victim.currentHealth);
+    victim.currentHealth -= result.damageApplied;
+    result.remainingHealth = victim.currentHealth;
+
+    if (hitbox.hitstopTicks > 0) {
+        applyHitstop(victim, hitbox.hitstopTicks);
+    }
+    if (hitbox.stunTicks > 0) {
+        applyStun(victim, hitbox.stunTicks);
+    }
+    result.hitstopTicks = hitbox.hitstopTicks;
+    result.stunTicks = hitbox.stunTicks;
+
+    result.reactionMove = hitbox.reactionMove;
+    if (!hitbox.reactionMove.empty()) {
+        if (const RuntimeMove *reaction = runtime.moveLibrary.findByLogicalId(hitbox.reactionMove)) {
+            startMoveWithoutEvent(runtime, victim, *reaction);
+            result.reactionStarted = true;
+        }
+    }
+
+    return result;
+}
 } // namespace vac::combat

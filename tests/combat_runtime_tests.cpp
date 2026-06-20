@@ -59,7 +59,30 @@ std::vector<vac::simulation::RuntimeActor> oneActor()
     return {actor};
 }
 
+std::vector<vac::simulation::RuntimeActor> twoActors()
+{
+    vac::simulation::RuntimeActor attacker;
+    attacker.id = {1};
+    attacker.spawnId = "player_spawn";
+    attacker.team = "player";
+
+    vac::simulation::RuntimeActor victim;
+    victim.id = {2};
+    victim.spawnId = "enemy_spawn";
+    victim.team = "enemy";
+    return {attacker, victim};
+}
+
 vac::combat::CombatRuntime makeRuntime() { return vac::combat::createCombatRuntime(makeLibrary(), oneActor()); }
+
+vac::combat::CombatRuntime makeDuelRuntime()
+{
+    vac::combat::CombatRuntime runtime = vac::combat::createCombatRuntime(makeLibrary(), twoActors());
+    for (vac::combat::CombatActorState &actor : runtime.actors) {
+        vac::combat::setActorHealth(actor, 100, 100);
+    }
+    return runtime;
+}
 
 vac::simulation::InputFrame commandAt(uint32_t tick, std::string command)
 {
@@ -70,9 +93,10 @@ vac::simulation::InputFrame commandAt(uint32_t tick, std::string command)
     return input;
 }
 
-std::string activeMoveLogicalId(const vac::combat::CombatRuntime &runtime)
+std::string activeMoveLogicalId(const vac::combat::CombatRuntime &runtime,
+                                vac::simulation::RuntimeActorId actorId = {1})
 {
-    const vac::combat::CombatActorState *actor = vac::combat::findCombatActor(runtime, {1});
+    const vac::combat::CombatActorState *actor = vac::combat::findCombatActor(runtime, actorId);
     if (actor == nullptr || actor->activeMoveId == 0) {
         return {};
     }
@@ -233,6 +257,46 @@ void hitstopAndStunCountersTickDown()
     expect(actor->stunRemaining == 0, "stun decrements second tick");
 }
 
+void hitEffectAppliesDamageTimingAndReaction()
+{
+    vac::combat::CombatRuntime runtime = makeDuelRuntime();
+    vac::combat::CombatActorState *victim = vac::combat::findCombatActor(runtime, {2});
+    const vac::combat::RuntimeMove *attack = runtime.moveLibrary.findByLogicalId("move.light_attack");
+    expect(victim != nullptr, "victim exists for hit effect test");
+    expect(attack != nullptr && !attack->compiled.hitboxTracks.empty(), "attack hitbox exists for hit effect test");
+    if (victim == nullptr || attack == nullptr || attack->compiled.hitboxTracks.empty()) {
+        return;
+    }
+
+    const vac::combat::CombatHitEffectResult effect =
+        vac::combat::applyHitEffect(runtime, *victim, attack->compiled.hitboxTracks.front());
+    expect(effect.damageApplied == 12, "hit effect applies authored damage");
+    expect(effect.remainingHealth == 88, "hit effect reports remaining health");
+    expect(victim->currentHealth == 88, "victim health is reduced");
+    expect(effect.hitstopTicks == 1 && victim->hitstopRemaining == 1, "hit effect applies hitstop");
+    expect(effect.stunTicks == 3 && victim->stunRemaining == 3, "hit effect applies stun");
+    expect(effect.reactionStarted, "hit effect starts reaction");
+    expect(activeMoveLogicalId(runtime, {2}) == "move.hit_reaction", "victim starts hit reaction move");
+}
+
+void hitEffectDamageClampsAtZero()
+{
+    vac::combat::CombatRuntime runtime = makeDuelRuntime();
+    vac::combat::CombatActorState *victim = vac::combat::findCombatActor(runtime, {2});
+    const vac::combat::RuntimeMove *attack = runtime.moveLibrary.findByLogicalId("move.light_attack");
+    expect(victim != nullptr && attack != nullptr && !attack->compiled.hitboxTracks.empty(),
+           "damage clamp fixture exists");
+    if (victim == nullptr || attack == nullptr || attack->compiled.hitboxTracks.empty()) {
+        return;
+    }
+
+    vac::combat::setActorHealth(*victim, 5, 100);
+    const vac::combat::CombatHitEffectResult effect =
+        vac::combat::applyHitEffect(runtime, *victim, attack->compiled.hitboxTracks.front());
+    expect(effect.damageApplied == 5, "damage clamps to remaining health");
+    expect(effect.remainingHealth == 0 && victim->currentHealth == 0, "victim health does not underflow");
+}
+
 void eventIdsAreStable()
 {
     const std::string first = eventSummary(runLightAttackBoundarySequence());
@@ -250,6 +314,8 @@ int main()
         authoredDodgeAndHitReactionExist();
         alwaysDodgeCancelUsesAuthoredMove();
         hitstopAndStunCountersTickDown();
+        hitEffectAppliesDamageTimingAndReaction();
+        hitEffectDamageClampsAtZero();
         eventIdsAreStable();
     } catch (const std::exception &error) {
         ++g_failures;

@@ -74,6 +74,31 @@ MoveResources readResources(const json &value)
 
 json resourcesToJson(const MoveResources &resources) { return {{"staminaCost", resources.staminaCost}}; }
 
+void readHitboxEffect(const json &value, HitboxTrack &track)
+{
+    if (!value.is_object()) {
+        return;
+    }
+    const json effect = value.value("effect", json::object());
+    if (!effect.is_object()) {
+        return;
+    }
+    track.damage = effect.value("damage", 0u);
+    track.hitstopTicks = static_cast<uint16_t>(effect.value("hitstopTicks", 0u));
+    track.stunTicks = static_cast<uint16_t>(effect.value("stunTicks", 0u));
+    track.reactionMove = effect.value("reactionMove", "");
+}
+
+json hitboxEffectToJson(const HitboxTrack &track)
+{
+    return {
+        {"damage", track.damage},
+        {"hitstopTicks", track.hitstopTicks},
+        {"reactionMove", track.reactionMove},
+        {"stunTicks", track.stunTicks},
+    };
+}
+
 bool finiteVec3(glm::vec3 value) { return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z); }
 
 bool positiveVec3(glm::vec3 value) { return finiteVec3(value) && value.x > 0.0f && value.y > 0.0f && value.z > 0.0f; }
@@ -168,11 +193,15 @@ MoveAsset moveAssetFromJson(const nlohmann::json &document, std::filesystem::pat
                                         readStringVector(item.value("tags", json::array()))});
     }
     for (const json &item : document.value("hitboxTracks", json::array())) {
-        asset.hitboxTracks.push_back({item.value("id", ""), readRange(item), item.value("shape", ""),
-                                      item.value("socket", ""),
-                                      readVec3(item.value("size", json::array()), {1.0f, 1.0f, 1.0f}),
-                                      readVec3(item.value("offset", json::array()), {0.0f, 0.0f, 0.0f}),
-                                      readStringVector(item.value("tags", json::array()))});
+        HitboxTrack track{item.value("id", ""),
+                          readRange(item),
+                          item.value("shape", ""),
+                          item.value("socket", ""),
+                          readVec3(item.value("size", json::array()), {1.0f, 1.0f, 1.0f}),
+                          readVec3(item.value("offset", json::array()), {0.0f, 0.0f, 0.0f}),
+                          readStringVector(item.value("tags", json::array()))};
+        readHitboxEffect(item, track);
+        asset.hitboxTracks.push_back(std::move(track));
     }
     for (const json &item : document.value("hurtboxOverrides", json::array())) {
         asset.hurtboxOverrides.push_back({item.value("id", ""), readRange(item), item.value("profile", ""),
@@ -240,6 +269,7 @@ nlohmann::json toCanonicalJson(const MoveAsset &asset)
         hitboxArray.push_back({{"id", track.id},
                                {"beginTick", track.range.begin},
                                {"endTick", track.range.end},
+                               {"effect", hitboxEffectToJson(track)},
                                {"offset", vec3ToJson(track.offset)},
                                {"shape", track.shape},
                                {"size", vec3ToJson(track.size)},
@@ -349,6 +379,11 @@ ValidationResult validateMoveAsset(const MoveAsset &asset)
             !finiteVec3(track.offset)) {
             addError(result, asset, "invalid_hitbox_track", "HitboxTrack", "hitboxTracks/" + track.id,
                      "Hitbox track shape/socket/size/offset must be valid");
+        }
+        if (!track.reactionMove.empty() && !knownMoves.contains(track.reactionMove)) {
+            addError(result, asset, "unknown_reaction_move", "HitboxTrack",
+                     "hitboxTracks/" + track.id + "/effect/reactionMove",
+                     "Hitbox effect reaction move is not known");
         }
     }
     for (const HurtboxOverride &track : asset.hurtboxOverrides) {
@@ -466,7 +501,11 @@ MoveCompileResult compileMoveAsset(const MoveAsset &asset)
                                             track.socket,
                                             track.size,
                                             track.offset,
-                                            internTags(result.move.internTable, track.tags)});
+                                            internTags(result.move.internTable, track.tags),
+                                            track.damage,
+                                            track.hitstopTicks,
+                                            track.stunTicks,
+                                            track.reactionMove});
     }
     for (const HurtboxOverride &track : hurtboxOverrides) {
         result.move.hurtboxOverrides.push_back({internIndex(result.move.internTable.trackIds, track.id),
