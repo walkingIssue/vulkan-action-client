@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: sprint01/sp1-012-command-script-map-wireframing
-Start commit: 11b3220
+Start commit: d45f91d
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 9.9: Map authoring workflow
