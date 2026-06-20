@@ -245,7 +245,7 @@ Coordination rules:
 
 - At start of work, append branch, checkout path, current task, and likely touched files to your `status/<agent>.md`.
 - Before editing high-conflict files, append a claim with intent, files, response deadline, and default action.
-- Use a 2-minute response window for routine claims. If no response appears, proceed conservatively with the smallest useful change.
+- Use a 4-minute response window for routine claims. If no response appears, proceed conservatively with the smallest useful change.
 - For direct requests, append to the other agent's inbox and include the same response deadline and default action.
 - Record durable cross-ticket decisions in `decisions.md`.
 - Before push or merge, append branch, commit, tests, and watchouts to `merge-log.md`.
