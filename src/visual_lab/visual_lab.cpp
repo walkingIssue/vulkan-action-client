@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <unordered_map>
 #include <string_view>
 #include <stdexcept>
 
@@ -10,6 +11,7 @@
 
 #include "animation/proxy_animation.hpp"
 #include "combat/combat_collision.hpp"
+#include "combat/combat_scenario.hpp"
 #include "content/move_asset.hpp"
 
 namespace vac::visual_lab
@@ -315,6 +317,78 @@ void addDiagnostic(std::vector<std::string> &diagnostics, const content::Content
 {
     diagnostics.push_back(diagnostic.code + ": " + diagnostic.message);
 }
+
+void addScenarioDiagnostic(std::vector<std::string> &diagnostics, const combat::ScenarioDiagnostic &diagnostic)
+{
+    diagnostics.push_back("scenario:" + diagnostic.code + ":" + diagnostic.fieldPath + ": " + diagnostic.message);
+}
+
+std::string boolString(bool value)
+{
+    return value ? "true" : "false";
+}
+
+void appendScenarioResultDiagnostics(std::vector<std::string> &diagnostics,
+                                     const combat::ScenarioRunResult &scenarioResult)
+{
+    const std::string scenarioId = scenarioResult.trace.scenarioId.empty()
+        ? scenarioResult.scenario.logicalId
+        : scenarioResult.trace.scenarioId;
+    diagnostics.push_back("visualLabSource=scenario");
+    diagnostics.push_back("scenarioId=" + scenarioId);
+    diagnostics.push_back("scenarioStatus=" + scenarioResult.status);
+    diagnostics.push_back("scenarioGoldenCompared=" + boolString(scenarioResult.goldenCompared));
+    diagnostics.push_back("scenarioGoldenMatched=" + boolString(scenarioResult.goldenMatched));
+    diagnostics.push_back("scenarioTraceEventCount=" + std::to_string(scenarioResult.trace.events.size()));
+    diagnostics.push_back("scenarioFinalStateHash=" + scenarioResult.trace.finalStateHash);
+    diagnostics.push_back("scenarioTicksRun=" + std::to_string(scenarioResult.trace.ticksRun));
+    diagnostics.push_back("scenarioGoldenPath=" + scenarioResult.goldenPath.generic_string());
+    if (!scenarioResult.message.empty()) {
+        diagnostics.push_back("scenarioMessage=" + scenarioResult.message);
+    }
+    for (const combat::ScenarioDiagnostic &diagnostic : scenarioResult.diagnostics) {
+        addScenarioDiagnostic(diagnostics, diagnostic);
+    }
+}
+
+void populateVisualLabScene(VisualLabScene &result,
+                            const content::RuntimeWorld &world,
+                            const content::CompiledMove &move,
+                            const animation::ProxyAnimationAsset &animation,
+                            const simulation::RuntimeWorld &simulationWorld)
+{
+    result.scene = buildSceneRuntime(world, simulationWorld);
+
+    result.summary.primitiveCount = static_cast<uint32_t>(world.entities.size());
+    result.summary.colliderCount = static_cast<uint32_t>(world.colliders.size());
+    result.summary.spawnPointCount = static_cast<uint32_t>(world.spawnPoints.size());
+    result.summary.actorRootCount = static_cast<uint32_t>(simulationWorld.actors.size());
+    result.summary.movePhaseWindowCount = static_cast<uint32_t>(move.phases.size());
+    result.summary.hitboxVolumeCount = static_cast<uint32_t>(move.hitboxTracks.size());
+    result.summary.hurtboxVolumeCount = static_cast<uint32_t>(move.hurtboxOverrides.size());
+    result.summary.proxySocketMarkerCount =
+        static_cast<uint32_t>(animation::sampleProxyPoseAtTick(animation, 10).sockets.size());
+    result.summary.rootMotionPathSegmentCount =
+        animation.rootMotion.empty() ? 0u : static_cast<uint32_t>(animation.rootMotion.size() - 1);
+    result.summary.interpolationSampleCount = 3;
+
+    appendBounds(result.debugDraw.lineVertices, boundsFromWorld(world.worldBounds), {0.40f, 0.95f, 0.72f});
+    for (const content::RuntimeSpawnPoint &spawn : world.spawnPoints) {
+        appendSpawnMarker(result.debugDraw.lineVertices, spawn);
+    }
+    for (const simulation::RuntimeActor &actor : simulationWorld.actors) {
+        appendActorRoot(result.debugDraw.lineVertices, actor);
+    }
+
+    const glm::vec3 origin = firstSpawnOrOrigin(world);
+    appendMovePhaseWindows(result.debugDraw.lineVertices, move);
+    appendCombatVolumes(result.debugDraw.lineVertices, move, animation, origin);
+    appendRootMotionPath(result.debugDraw.lineVertices, animation, origin);
+    appendProxySockets(result.debugDraw.lineVertices, animation, origin, 10.0f);
+    appendInterpolationSamples(result.debugDraw.lineVertices, animation, origin);
+
+    result.summary.debugLineVertexCount = static_cast<uint32_t>(result.debugDraw.lineVertices.size());
+}
 } // namespace
 
 VisualLabAssetPaths defaultVisualLabAssetPaths()
@@ -359,37 +433,99 @@ VisualLabScene buildVisualLabScene(const VisualLabAssetPaths &paths)
     }
 
     simulation::RuntimeWorld simulationWorld = simulation::importRuntimeWorld(mapCompile.world);
-    result.scene = buildSceneRuntime(mapCompile.world, simulationWorld);
+    populateVisualLabScene(result, mapCompile.world, moveCompile.move, animation, simulationWorld);
+    return result;
+}
 
-    result.summary.primitiveCount = static_cast<uint32_t>(mapCompile.world.entities.size());
-    result.summary.colliderCount = static_cast<uint32_t>(mapCompile.world.colliders.size());
-    result.summary.spawnPointCount = static_cast<uint32_t>(mapCompile.world.spawnPoints.size());
-    result.summary.actorRootCount = static_cast<uint32_t>(simulationWorld.actors.size());
-    result.summary.movePhaseWindowCount = static_cast<uint32_t>(moveCompile.move.phases.size());
-    result.summary.hitboxVolumeCount = static_cast<uint32_t>(moveCompile.move.hitboxTracks.size());
-    result.summary.hurtboxVolumeCount = static_cast<uint32_t>(moveCompile.move.hurtboxOverrides.size());
-    result.summary.proxySocketMarkerCount =
-        static_cast<uint32_t>(animation::sampleProxyPoseAtTick(animation, 10).sockets.size());
-    result.summary.rootMotionPathSegmentCount =
-        animation.rootMotion.empty() ? 0u : static_cast<uint32_t>(animation.rootMotion.size() - 1);
-    result.summary.interpolationSampleCount = 3;
+VisualLabScene buildVisualLabSceneFromScenario(const std::filesystem::path &scenarioPath)
+{
+    VisualLabScene result;
 
-    appendBounds(result.debugDraw.lineVertices, boundsFromWorld(mapCompile.world.worldBounds), {0.40f, 0.95f, 0.72f});
-    for (const content::RuntimeSpawnPoint &spawn : mapCompile.world.spawnPoints) {
-        appendSpawnMarker(result.debugDraw.lineVertices, spawn);
+    combat::CombatScenario scenario = combat::loadCombatScenario(scenarioPath);
+    const combat::ScenarioRunResult scenarioResult = combat::runCombatScenario(scenario);
+    appendScenarioResultDiagnostics(result.resultDiagnostics, scenarioResult);
+    if (scenarioResult.status != "ok") {
+        if (scenarioResult.diagnostics.empty()) {
+            result.diagnostics.push_back("scenario: " + scenarioResult.message);
+        } else {
+            for (const combat::ScenarioDiagnostic &diagnostic : scenarioResult.diagnostics) {
+                addScenarioDiagnostic(result.diagnostics, diagnostic);
+            }
+        }
+        return result;
     }
-    for (const simulation::RuntimeActor &actor : simulationWorld.actors) {
-        appendActorRoot(result.debugDraw.lineVertices, actor);
+
+    scenario = scenarioResult.scenario;
+    const combat::CombatScenarioResolvedPaths paths = combat::resolveCombatScenarioPaths(scenario);
+
+    const content::AuthoringScene authoringScene = content::loadAuthoringScene(paths.mapPath);
+    const content::CompileResult mapCompile = content::compileRuntimeWorld(authoringScene);
+    for (const content::ContentDiagnostic &diagnostic : mapCompile.validation.diagnostics) {
+        addDiagnostic(result.diagnostics, diagnostic);
+    }
+    if (!mapCompile.ok()) {
+        return result;
     }
 
-    const glm::vec3 origin = firstSpawnOrOrigin(mapCompile.world);
-    appendMovePhaseWindows(result.debugDraw.lineVertices, moveCompile.move);
-    appendCombatVolumes(result.debugDraw.lineVertices, moveCompile.move, animation, origin);
-    appendRootMotionPath(result.debugDraw.lineVertices, animation, origin);
-    appendProxySockets(result.debugDraw.lineVertices, animation, origin, 10.0f);
-    appendInterpolationSamples(result.debugDraw.lineVertices, animation, origin);
+    std::vector<content::CompiledMove> moves;
+    moves.reserve(paths.movePaths.size());
+    for (const std::filesystem::path &movePath : paths.movePaths) {
+        const content::MoveAsset moveAsset = content::loadMoveAsset(movePath);
+        const content::MoveCompileResult moveCompile = content::compileMoveAsset(moveAsset);
+        for (const content::ContentDiagnostic &diagnostic : moveCompile.validation.diagnostics) {
+            addDiagnostic(result.diagnostics, diagnostic);
+        }
+        if (!moveCompile.ok()) {
+            return result;
+        }
+        moves.push_back(moveCompile.move);
+    }
+    if (moves.empty()) {
+        result.diagnostics.push_back("scenario_visual_lab_missing_move: Scenario has no move assets");
+        return result;
+    }
 
-    result.summary.debugLineVertexCount = static_cast<uint32_t>(result.debugDraw.lineVertices.size());
+    std::unordered_map<std::string, std::filesystem::path> animationPathsByMove;
+    for (const combat::ScenarioResolvedAnimationPath &binding : paths.animations) {
+        animationPathsByMove[binding.moveLogicalId] = binding.path;
+    }
+
+    size_t selectedMoveIndex = 0;
+    std::filesystem::path selectedAnimationPath;
+    for (size_t i = 0; i < moves.size(); ++i) {
+        const auto animationIt = animationPathsByMove.find(moves[i].logicalId);
+        if (animationIt != animationPathsByMove.end() && !moves[i].hitboxTracks.empty()) {
+            selectedMoveIndex = i;
+            selectedAnimationPath = animationIt->second;
+            break;
+        }
+    }
+    if (selectedAnimationPath.empty()) {
+        for (size_t i = 0; i < moves.size(); ++i) {
+            const auto animationIt = animationPathsByMove.find(moves[i].logicalId);
+            if (animationIt != animationPathsByMove.end()) {
+                selectedMoveIndex = i;
+                selectedAnimationPath = animationIt->second;
+                break;
+            }
+        }
+    }
+    if (selectedAnimationPath.empty()) {
+        result.diagnostics.push_back("scenario_visual_lab_missing_animation: Scenario has no proxy animation binding");
+        return result;
+    }
+
+    const animation::ProxyAnimationAsset animation = animation::loadProxyAnimation(selectedAnimationPath);
+    const content::ValidationResult animationValidation = animation::validateProxyAnimation(animation);
+    for (const content::ContentDiagnostic &diagnostic : animationValidation.diagnostics) {
+        addDiagnostic(result.diagnostics, diagnostic);
+    }
+    if (!animationValidation.ok()) {
+        return result;
+    }
+
+    const simulation::RuntimeWorld simulationWorld = combat::makeScenarioRuntimeWorld(scenario, mapCompile.world);
+    populateVisualLabScene(result, mapCompile.world, moves[selectedMoveIndex], animation, simulationWorld);
     return result;
 }
 

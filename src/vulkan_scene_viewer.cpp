@@ -80,6 +80,7 @@ struct ViewerOptions
     bool visualLab = false;
     std::filesystem::path visualLabMovePath;
     std::filesystem::path visualLabProxyAnimationPath;
+    std::filesystem::path visualLabScenarioPath;
     vac::host::CommonHostOptions common;
 };
 
@@ -190,6 +191,15 @@ ViewerOptions parseOptions(int argc, char **argv)
         }
         options.visualLabProxyAnimationPath = *animationPath;
     }
+    if (const std::optional<std::string> scenarioPath = commandLine.consumeValue("--scenario")) {
+        if (!options.visualLab) {
+            throw vac::host::ParseError("--scenario requires --visual-lab");
+        }
+        if (options.common.scene.has_value()) {
+            throw vac::host::ParseError("--scenario cannot be combined with --scene");
+        }
+        options.visualLabScenarioPath = *scenarioPath;
+    }
     if (const std::optional<std::string> networkServer = commandLine.consumeValue("--net-server")) {
         options.networkServer = *networkServer;
     }
@@ -247,17 +257,22 @@ public:
     {
         loadInitialControlProfile();
         if (m_options.visualLab) {
-            vac::visual_lab::VisualLabAssetPaths paths;
-            paths.mapPath = m_options.scenePath;
-            paths.movePath = m_options.visualLabMovePath;
-            paths.proxyAnimationPath = m_options.visualLabProxyAnimationPath;
-            const vac::visual_lab::VisualLabScene labScene = vac::visual_lab::buildVisualLabScene(paths);
+            const vac::visual_lab::VisualLabScene labScene = m_options.visualLabScenarioPath.empty()
+                ? vac::visual_lab::buildVisualLabScene({
+                      m_options.scenePath,
+                      m_options.visualLabMovePath,
+                      m_options.visualLabProxyAnimationPath,
+                  })
+                : vac::visual_lab::buildVisualLabSceneFromScenario(m_options.visualLabScenarioPath);
             if (!labScene.diagnostics.empty()) {
                 throw std::runtime_error("Visual lab asset validation failed: " + labScene.diagnostics.front());
             }
             m_scene = labScene.scene;
             m_lineData = labScene.debugDraw;
             m_resultDiagnostics = vac::visual_lab::summaryDiagnostics(labScene.summary);
+            m_resultDiagnostics.insert(m_resultDiagnostics.end(),
+                                       labScene.resultDiagnostics.begin(),
+                                       labScene.resultDiagnostics.end());
         } else {
             m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
             m_lineData = vac::buildSceneLineData(m_scene);

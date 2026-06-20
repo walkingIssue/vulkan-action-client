@@ -12,6 +12,11 @@
 #include "combat/combat_collision.hpp"
 #include "simulation/runtime_world.hpp"
 
+namespace vac::content
+{
+struct RuntimeWorld;
+}
+
 namespace vac::combat
 {
 inline constexpr uint32_t kCombatScenarioSchemaVersion = 1;
@@ -69,6 +74,20 @@ struct CombatScenario
     std::filesystem::path goldenPath;
 };
 
+struct ScenarioResolvedAnimationPath
+{
+    std::string moveLogicalId;
+    std::filesystem::path path;
+};
+
+struct CombatScenarioResolvedPaths
+{
+    std::filesystem::path mapPath;
+    std::vector<std::filesystem::path> movePaths;
+    std::vector<ScenarioResolvedAnimationPath> animations;
+    std::filesystem::path goldenPath;
+};
+
 struct ScenarioTraceEvent
 {
     uint32_t sequence = 0;
@@ -112,6 +131,10 @@ struct ScenarioRunOptions
 
 CombatScenario combatScenarioFromJson(const nlohmann::json &document, std::filesystem::path sourcePath = {});
 CombatScenario loadCombatScenario(const std::filesystem::path &path);
+std::filesystem::path resolveScenarioPath(const CombatScenario &scenario, const std::filesystem::path &path);
+CombatScenarioResolvedPaths resolveCombatScenarioPaths(const CombatScenario &scenario);
+simulation::RuntimeWorld makeScenarioRuntimeWorld(const CombatScenario &scenario,
+                                                  const content::RuntimeWorld &contentWorld);
 nlohmann::json toJson(const ScenarioTraceEvent &event);
 nlohmann::json toJson(const ScenarioTrace &trace);
 nlohmann::json toJson(const ScenarioRunResult &result);
