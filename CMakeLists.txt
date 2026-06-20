@@ -164,6 +164,10 @@ target_link_libraries(combat_scenario_core PUBLIC
     nlohmann_json::nlohmann_json
 )
 
+target_link_libraries(visual_lab_core PUBLIC
+    combat_scenario_core
+)
+
 add_library(input_core
     src/input/glfw_control_bindings.cpp
 )
@@ -681,6 +685,21 @@ if(BUILD_TESTING)
     set_tests_properties(visual_lab_smoke PROPERTIES
         TIMEOUT 30
         LABELS "viewer;smoke;visual;process"
+    )
+
+    add_test(
+        NAME visual_lab_scenario_smoke
+        COMMAND vulkan_scene_viewer
+                --visual-lab
+                --offline
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/sword_light_hits_idle_target.scenario.json"
+                --frames 3
+                --ticks 20
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/visual_lab_scenario_smoke_result.json"
+    )
+    set_tests_properties(visual_lab_scenario_smoke PROPERTIES
+        TIMEOUT 30
+        LABELS "viewer;smoke;visual;process;scenario"
     )
 
     add_test(

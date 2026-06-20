@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: mitigation01/rm1-004-scenario-visual-lab
-Start commit: pending
+Start commit: `b937b33`
 Source plan: docs/sprint-01-risk-mitigation-plan.md
 Source result docs:
 - docs/tickets/RM1-003-cross-asset-validation_result.md
@@ -90,10 +90,13 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after RM1-002 landed and Mia released RM1-004 implementation.
+- 2026-06-20: Added scenario-driven visual lab build path, viewer `--scenario` routing, focused unit coverage, and scenario visual-lab smoke registration.
 
 ## Verification Results
 
-Fill this before merge.
+- `cmake --build --preset msvc-debug --target visual_lab_tests vulkan_scene_viewer` passed.
+- `ctest --test-dir build/msvc-debug -R "visual_lab" --output-on-failure` passed: 3/3.
+- `build/msvc-debug/test-artifacts/visual_lab_scenario_smoke_result.json` reported `status: ok`, `visualLabSource=scenario`, `scenarioId=scenario.sword_light_hits_idle_target`, `scenarioGoldenMatched=true`, `scenarioTraceEventCount=8`, and `scenarioFinalStateHash=0x899156866903d60e`.
 
 ## Final Commits
 

@@ -72,6 +72,43 @@ void summaryDiagnosticsAreStructured()
     expect(std::find(diagnostics.begin(), diagnostics.end(), "debugLineVertexCount=128") != diagnostics.end(),
            "summary includes debug line count");
 }
+
+void scenarioLabBuildsScenarioDiagnostics()
+{
+    const std::filesystem::path scenarioPath =
+        vac::defaultProjectRoot() / "tests/fixtures/scenarios/sword_light_hits_idle_target.scenario.json";
+    const vac::visual_lab::VisualLabScene scene = vac::visual_lab::buildVisualLabSceneFromScenario(scenarioPath);
+
+    expect(scene.diagnostics.empty(), "scenario visual lab has no diagnostics");
+    expect(scene.summary.primitiveCount == 3, "scenario visual lab primitive count");
+    expect(scene.summary.actorRootCount == 2, "scenario visual lab actor roots from scenario actors");
+    expect(scene.summary.hitboxVolumeCount == 1, "scenario visual lab hitbox count");
+    expect(scene.summary.debugLineVertexCount > 80, "scenario visual lab has substantial debug lines");
+
+    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "visualLabSource=scenario") !=
+               scene.resultDiagnostics.end(),
+           "scenario diagnostics mark visual lab source");
+    expect(std::find(scene.resultDiagnostics.begin(),
+                     scene.resultDiagnostics.end(),
+                     "scenarioId=scenario.sword_light_hits_idle_target") != scene.resultDiagnostics.end(),
+           "scenario diagnostics include scenario id");
+    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioStatus=ok") !=
+               scene.resultDiagnostics.end(),
+           "scenario diagnostics include scenario status");
+    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioGoldenCompared=true") !=
+               scene.resultDiagnostics.end(),
+           "scenario diagnostics include golden compared");
+    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioGoldenMatched=true") !=
+               scene.resultDiagnostics.end(),
+           "scenario diagnostics include golden matched");
+    expect(std::find(scene.resultDiagnostics.begin(), scene.resultDiagnostics.end(), "scenarioTraceEventCount=8") !=
+               scene.resultDiagnostics.end(),
+           "scenario diagnostics include trace event count");
+    expect(std::find(scene.resultDiagnostics.begin(),
+                     scene.resultDiagnostics.end(),
+                     "scenarioFinalStateHash=0x899156866903d60e") != scene.resultDiagnostics.end(),
+           "scenario diagnostics include final state hash");
+}
 } // namespace
 
 int main()
@@ -80,6 +117,7 @@ int main()
         defaultLabBuildsSprintDebugScene();
         missingMapReportsDiagnostic();
         summaryDiagnosticsAreStructured();
+        scenarioLabBuildsScenarioDiagnostics();
     } catch (const std::exception &error) {
         ++g_failures;
         std::cerr << "FAIL: unexpected exception: " << error.what() << '\n';

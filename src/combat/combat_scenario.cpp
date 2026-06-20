@@ -789,6 +789,33 @@ CombatScenario loadCombatScenario(const std::filesystem::path &path)
     return combatScenarioFromJson(document, path);
 }
 
+std::filesystem::path resolveScenarioPath(const CombatScenario &scenario, const std::filesystem::path &path)
+{
+    return resolvePath(scenario, path);
+}
+
+CombatScenarioResolvedPaths resolveCombatScenarioPaths(const CombatScenario &scenario)
+{
+    CombatScenarioResolvedPaths paths;
+    paths.mapPath = resolveScenarioPath(scenario, scenario.mapPath);
+    paths.goldenPath = resolveScenarioPath(scenario, scenario.goldenPath);
+    paths.movePaths.reserve(scenario.movePaths.size());
+    for (const std::filesystem::path &movePath : scenario.movePaths) {
+        paths.movePaths.push_back(resolveScenarioPath(scenario, movePath));
+    }
+    paths.animations.reserve(scenario.animations.size());
+    for (const ScenarioAnimationBinding &binding : scenario.animations) {
+        paths.animations.push_back({binding.moveLogicalId, resolveScenarioPath(scenario, binding.path)});
+    }
+    return paths;
+}
+
+simulation::RuntimeWorld makeScenarioRuntimeWorld(const CombatScenario &scenario,
+                                                  const content::RuntimeWorld &contentWorld)
+{
+    return makeRuntimeWorld(scenario, contentWorld);
+}
+
 nlohmann::json toJson(const ScenarioTraceEvent &event)
 {
     return {

@@ -40,9 +40,11 @@ struct VisualLabScene
     SceneDrawData debugDraw;
     VisualLabSummary summary;
     std::vector<std::string> diagnostics;
+    std::vector<std::string> resultDiagnostics;
 };
 
 VisualLabAssetPaths defaultVisualLabAssetPaths();
 VisualLabScene buildVisualLabScene(const VisualLabAssetPaths &paths);
+VisualLabScene buildVisualLabSceneFromScenario(const std::filesystem::path &scenarioPath);
 std::vector<std::string> summaryDiagnostics(const VisualLabSummary &summary);
 } // namespace vac::visual_lab
