@@ -4,6 +4,9 @@ param(
 
     [int]$Port = 40000,
 
+    [ValidateRange(1, 2)]
+    [int]$Clients = 2,
+
     [switch]$NoServer
 )
 
@@ -23,22 +26,66 @@ $buildDir = Resolve-Path (Join-Path $PSScriptRoot "..\build\$Preset")
 $serverExe = Join-Path $buildDir "udp_state_server.exe"
 $viewerExe = Join-Path $buildDir "vulkan_scene_viewer.exe"
 $serverEndpoint = "127.0.0.1:$Port"
+$logDir = Join-Path $buildDir "run-logs\network-clients"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 if (-not $NoServer) {
-    $server = Start-Process -FilePath $serverExe `
-        -ArgumentList @("--bind", $serverEndpoint, "--dump-packets", "64") `
-        -PassThru `
-        -WindowStyle Hidden
-    Start-Sleep -Milliseconds 250
-    Write-Host "Started relay pid=$($server.Id) on $serverEndpoint"
+    $existingServer = Get-CimInstance Win32_Process -Filter "name = 'udp_state_server.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like "*--bind $serverEndpoint*" } |
+        Select-Object -First 1
+
+    if ($existingServer) {
+        Write-Host "Reusing relay pid=$($existingServer.ProcessId) on $serverEndpoint"
+    } else {
+        $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $serverOut = Join-Path $logDir "server-$stamp.out.log"
+        $serverErr = Join-Path $logDir "server-$stamp.err.log"
+        $server = Start-Process -FilePath $serverExe `
+            -ArgumentList @("--bind", $serverEndpoint, "--dump-packets", "64") `
+            -WorkingDirectory $buildDir `
+            -RedirectStandardOutput $serverOut `
+            -RedirectStandardError $serverErr `
+            -PassThru `
+            -WindowStyle Hidden
+        Start-Sleep -Milliseconds 350
+        $server.Refresh()
+        if ($server.HasExited) {
+            Write-Host "Relay stdout:"
+            if (Test-Path $serverOut) { Get-Content $serverOut }
+            Write-Host "Relay stderr:"
+            if (Test-Path $serverErr) { Get-Content $serverErr }
+            throw "Relay exited immediately with code $($server.ExitCode)."
+        }
+        Write-Host "Started relay pid=$($server.Id) on $serverEndpoint"
+    }
 }
 
-$client1 = Start-Process -FilePath $viewerExe `
-    -ArgumentList @("--net-client-id", "1", "--net-server", $serverEndpoint) `
-    -PassThru
-$client2 = Start-Process -FilePath $viewerExe `
-    -ArgumentList @("--net-client-id", "2", "--net-server", $serverEndpoint) `
-    -PassThru
+$started = @()
+for ($clientId = 1; $clientId -le $Clients; ++$clientId) {
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $clientOut = Join-Path $logDir "client$clientId-$stamp.out.log"
+    $clientErr = Join-Path $logDir "client$clientId-$stamp.err.log"
+    $client = Start-Process -FilePath $viewerExe `
+        -ArgumentList @("--net-client-id", $clientId.ToString(), "--net-server", $serverEndpoint) `
+        -WorkingDirectory $buildDir `
+        -RedirectStandardOutput $clientOut `
+        -RedirectStandardError $clientErr `
+        -PassThru
 
-Write-Host "Started client 1 pid=$($client1.Id)"
-Write-Host "Started client 2 pid=$($client2.Id)"
+    $started += $client
+    Write-Host "Started client $clientId pid=$($client.Id)"
+    Start-Sleep -Milliseconds 150
+}
+
+Start-Sleep -Milliseconds 500
+foreach ($index in 0..($started.Count - 1)) {
+    $client = $started[$index]
+    $clientId = $index + 1
+    $client.Refresh()
+    if ($client.HasExited) {
+        Write-Host "Client $clientId exited immediately with code $($client.ExitCode). Logs: $logDir"
+        throw "Client $clientId failed to stay running."
+    }
+}
+
+Write-Host "Logs: $logDir"
