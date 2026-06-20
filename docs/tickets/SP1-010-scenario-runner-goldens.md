@@ -1,6 +1,6 @@
 # SP1-010: Combat Scenario Runner and Golden Traces
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-010-scenario-runner-goldens
 Start commit: `8309d55`
 Source plan: `docs/sprint-01-implementation-plan.md`
@@ -94,11 +94,19 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-009 was merged and pushed; SP1-012 is active in a parallel lane.
+- 2026-06-20: Added `combat_scenario_core`, `combat_scenario_runner`, four scenario fixtures, four checked-in golden traces, guarded golden update behavior, mismatch diagnostics, CTest process coverage, and reconciled `CMakeLists.txt` with SP1-012.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed after rebasing onto remote `main` with SP1-012.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-combat` passed: 12/12 tests.
+- `ctest --preset msvc-debug-unit` passed: 14/14 tests.
+- `ctest --preset msvc-debug` passed: 22/22 tests, including `network_e2e`, `viewer_smoke`, SP1-012 map-command process coverage, and SP1-010 scenario process coverage.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- `build/msvc-debug/test-artifacts/scenario_hits_result.json` reported `status: ok`, `host: combat_scenario_runner`, `goldenCompared: true`, and `goldenMatched: true`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `d5f9679` Add SP1-010 combat scenario runner

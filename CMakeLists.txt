@@ -126,6 +126,26 @@ target_link_libraries(map_command_core PUBLIC
     nlohmann_json::nlohmann_json
 )
 
+add_library(combat_scenario_core
+    src/combat/combat_scenario.cpp
+)
+
+target_compile_features(combat_scenario_core PUBLIC cxx_std_20)
+
+target_include_directories(combat_scenario_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(combat_scenario_core PUBLIC
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(combat_scenario_core PUBLIC
+    animation_core
+    combat_runtime_core
+    nlohmann_json::nlohmann_json
+)
+
 add_library(input_core
     src/input/glfw_control_bindings.cpp
 )
@@ -251,6 +271,17 @@ target_compile_features(udp_state_server PRIVATE cxx_std_20)
 
 target_link_libraries(udp_state_server PRIVATE
     network_core
+)
+
+add_executable(combat_scenario_runner
+    src/combat_scenario_runner.cpp
+)
+
+target_compile_features(combat_scenario_runner PRIVATE cxx_std_20)
+
+target_link_libraries(combat_scenario_runner PRIVATE
+    combat_scenario_core
+    host_core
 )
 
 add_executable(vulkan_scene_viewer
@@ -410,6 +441,22 @@ if(BUILD_TESTING)
         LABELS "content;authoring;map;process"
     )
 
+    add_executable(combat_scenario_tests
+        tests/combat_scenario_tests.cpp
+    )
+
+    target_compile_features(combat_scenario_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(combat_scenario_tests PRIVATE
+        combat_scenario_core
+    )
+
+    add_test(NAME combat_scenario_tests COMMAND combat_scenario_tests)
+    set_tests_properties(combat_scenario_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;integration;combat;scenario"
+    )
+
     add_executable(movement_behavior_tests
         tests/movement_behavior_tests.cpp
     )
@@ -537,5 +584,66 @@ if(BUILD_TESTING)
     set_tests_properties(viewer_smoke PROPERTIES
         TIMEOUT 30
         LABELS "viewer;smoke;characterization"
+    )
+
+    add_test(
+        NAME combat_scenario_runner_hits
+        COMMAND combat_scenario_runner
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/sword_light_hits_idle_target.scenario.json"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/scenario_hits_result.json"
+                --headless
+    )
+    set_tests_properties(combat_scenario_runner_hits PROPERTIES
+        TIMEOUT 10
+        LABELS "combat;scenario;process"
+    )
+
+    add_test(
+        NAME combat_scenario_runner_whiff
+        COMMAND combat_scenario_runner
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/sword_light_whiffs.scenario.json"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/scenario_whiff_result.json"
+                --headless
+    )
+    set_tests_properties(combat_scenario_runner_whiff PROPERTIES
+        TIMEOUT 10
+        LABELS "combat;scenario;process"
+    )
+
+    add_test(
+        NAME combat_scenario_runner_cancel_on_hit
+        COMMAND combat_scenario_runner
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/sword_light_cancel_on_hit.scenario.json"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/scenario_cancel_on_hit_result.json"
+                --headless
+    )
+    set_tests_properties(combat_scenario_runner_cancel_on_hit PROPERTIES
+        TIMEOUT 10
+        LABELS "combat;scenario;process"
+    )
+
+    add_test(
+        NAME combat_scenario_runner_dodge_invulnerability
+        COMMAND combat_scenario_runner
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/dodge_invulnerability_boundary.scenario.json"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/scenario_dodge_invulnerability_result.json"
+                --headless
+    )
+    set_tests_properties(combat_scenario_runner_dodge_invulnerability PROPERTIES
+        TIMEOUT 10
+        LABELS "combat;scenario;process"
+    )
+
+    add_test(
+        NAME combat_scenario_runner_update_guard
+        COMMAND combat_scenario_runner
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/sword_light_hits_idle_target.scenario.json"
+                --update-golden
+                --headless
+    )
+    set_tests_properties(combat_scenario_runner_update_guard PROPERTIES
+        TIMEOUT 10
+        WILL_FAIL TRUE
+        LABELS "combat;scenario;process"
     )
 endif()
