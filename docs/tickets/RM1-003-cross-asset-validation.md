@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: mitigation01/rm1-003-cross-asset-validation
-Start commit: pending
+Start commit: `1eeb5b4`
 Source plan: docs/sprint-01-risk-mitigation-plan.md
 Source result docs:
 - docs/tickets/SP1-009-proxy-animation-keyframes_result.md
