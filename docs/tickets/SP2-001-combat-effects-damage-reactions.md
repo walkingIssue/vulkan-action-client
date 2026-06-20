@@ -2,7 +2,7 @@
 
 Status: active
 Branch: sprint02/sp2-001-combat-effects-damage-reactions
-Start commit: pending start-doc commit
+Start commit: `44c0422`
 Source plan: `docs/sprint-02-implementation-plan.md`
 Source dispatch: `C:\Users\Bartek\Documents\Playground\vulkan-agent-comms\claims\SP2-001.md`
 Required base: `origin/main` `8f816f3 Merge Sprint 02 planning docs`
