@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "move-invalid-destination",
+  "logicalId": "move.invalid_destination",
+  "durationTicks": 20,
+  "tags": ["startup", "recovery"],
+  "knownMoves": ["move.invalid_destination"],
+  "input": {"command": "light_attack", "bufferTicks": 4},
+  "phases": [{"id": "startup", "beginTick": 0, "endTick": 5, "tags": ["startup"]}],
+  "movementTracks": [],
+  "hitboxTracks": [],
+  "hurtboxOverrides": [],
+  "cancels": [{"id": "missing", "beginTick": 5, "endTick": 10, "condition": "always", "destinations": ["move.missing"], "tags": ["recovery"]}],
+  "resources": {"staminaCost": 0.0},
+  "events": []
+}
