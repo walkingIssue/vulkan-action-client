@@ -3,6 +3,8 @@
 /out/
 /cmake-build-*/
 /vcpkg_installed/
+/assets/extracted/
+/assets/cache/
 
 # Visual Studio / CMake local state
 /.vs/

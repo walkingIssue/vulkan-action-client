@@ -45,3 +45,13 @@ The project uses vcpkg manifest mode. After entering the dev shell:
 vcpkg install --triplet x64-windows
 cmake --preset msvc-debug
 ```
+
+## Bootstrap Scene
+
+The first scene uses a procedural floor plus character instances because no environment scene models are present yet.
+
+```powershell
+.\tools\prepare-assets.ps1
+cmake --build --preset msvc-debug
+.\build\msvc-debug\scene_probe.exe
+```

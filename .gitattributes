@@ -23,3 +23,6 @@
 *.ktx2 filter=lfs diff=lfs merge=lfs -text
 *.exr filter=lfs diff=lfs merge=lfs -text
 *.hdr filter=lfs diff=lfs merge=lfs -text
+
+# Source asset bundles
+*.zip filter=lfs diff=lfs merge=lfs -text

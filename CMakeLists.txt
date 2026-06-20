@@ -14,6 +14,24 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
+add_library(scene_core
+    src/scene/scene_runtime.cpp
+)
+
+target_compile_features(scene_core PUBLIC cxx_std_20)
+
+target_include_directories(scene_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(scene_core PUBLIC
+    assimp::assimp
+    fmt::fmt
+    glm::glm
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog
+)
+
 add_executable(toolchain_probe
     src/toolchain_probe.cpp
 )
@@ -35,4 +53,18 @@ target_link_libraries(toolchain_probe PRIVATE
     imgui::imgui
     nlohmann_json::nlohmann_json
     spdlog::spdlog
+)
+
+add_executable(scene_probe
+    src/scene_probe.cpp
+)
+
+target_compile_features(scene_probe PRIVATE cxx_std_20)
+
+target_compile_definitions(scene_probe PRIVATE
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(scene_probe PRIVATE
+    scene_core
 )

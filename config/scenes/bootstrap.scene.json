@@ -1,0 +1,54 @@
+{
+  "name": "bootstrap_arena",
+  "models": [
+    {
+      "id": "paladin",
+      "path": "assets/extracted/stylized_paladin_obj/Stylized_Paladin_Clean.obj"
+    }
+  ],
+  "procedural": [
+    {
+      "id": "arena_floor",
+      "name": "Arena Floor",
+      "type": "floor",
+      "size": [18.0, 18.0],
+      "transform": {
+        "translation": [0.0, -0.02, 0.0],
+        "rotation_degrees": [0.0, 0.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      }
+    }
+  ],
+  "entities": [
+    {
+      "id": "player_preview",
+      "name": "Player Preview",
+      "model": "paladin",
+      "transform": {
+        "translation": [0.0, 0.0, 0.0],
+        "rotation_degrees": [0.0, 180.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      }
+    },
+    {
+      "id": "sparring_partner_left",
+      "name": "Sparring Partner Left",
+      "model": "paladin",
+      "transform": {
+        "translation": [-2.75, 0.0, -2.25],
+        "rotation_degrees": [0.0, 35.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      }
+    },
+    {
+      "id": "sparring_partner_right",
+      "name": "Sparring Partner Right",
+      "model": "paladin",
+      "transform": {
+        "translation": [2.75, 0.0, -2.25],
+        "rotation_degrees": [0.0, -35.0, 0.0],
+        "scale": [1.0, 1.0, 1.0]
+      }
+    }
+  ]
+}
