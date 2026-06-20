@@ -80,21 +80,21 @@ bool applyCharacterLocomotion(ActorState &actor,
     return true;
 }
 
-bool applyCameraRelativeLocomotion(ActorState &actor,
-                                   LocalMoveIntent intent,
-                                   ControlFrame cameraFrame,
-                                   bool lockFacingToCamera,
-                                   float deltaSeconds,
-                                   ArenaLimits arena)
+bool applyFramedStrafeLocomotion(ActorState &actor,
+                                 LocalMoveIntent intent,
+                                 ControlFrame movementFrame,
+                                 bool lockFacingToMovementFrame,
+                                 float deltaSeconds,
+                                 ArenaLimits arena)
 {
     Transform &transform = actor.currentTransform;
     const glm::vec2 axes = normalizedDirection(intent.axes);
     const bool wantsBackpedal = axes.y < -0.0001f;
     bool rotated = false;
 
-    if (lockFacingToCamera || wantsBackpedal) {
-        rotated = std::abs(transform.rotationDegrees.y - cameraFrame.yawDegrees) > 0.001f;
-        transform.rotationDegrees.y = cameraFrame.yawDegrees;
+    if (lockFacingToMovementFrame) {
+        rotated = std::abs(transform.rotationDegrees.y - movementFrame.yawDegrees) > 0.001f;
+        transform.rotationDegrees.y = movementFrame.yawDegrees;
     }
 
     if (glm::dot(axes, axes) <= 0.0001f) {
@@ -102,8 +102,8 @@ bool applyCameraRelativeLocomotion(ActorState &actor,
     }
 
     const glm::vec2 direction = normalizedDirection(
-        rightFromYaw(cameraFrame.yawDegrees) * axes.x +
-        forwardFromYaw(cameraFrame.yawDegrees) * axes.y);
+        rightFromYaw(movementFrame.yawDegrees) * axes.x +
+        forwardFromYaw(movementFrame.yawDegrees) * axes.y);
     const float speedScale = wantsBackpedal ? kBackpedalSpeedScale : 1.0f;
 
     transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * speedScale * deltaSeconds;

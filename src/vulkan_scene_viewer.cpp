@@ -413,12 +413,22 @@ private:
             }
 
             if (m_playerIndex.has_value()) {
-                moved |= vac::combat::applyCameraRelativeLocomotion(m_actorStates[*m_playerIndex],
-                                                                    playerIntent,
-                                                                    {m_cameraYawDegrees},
-                                                                    lockPlayerFacingToCamera,
-                                                                    vac::combat::kFixedTickSeconds,
-                                                                    arena);
+                vac::combat::ActorState &player = m_actorStates[*m_playerIndex];
+                vac::combat::LocalMoveIntent tickIntent = playerIntent;
+                const float movementYawDegrees = lockPlayerFacingToCamera
+                    ? m_cameraYawDegrees
+                    : player.currentTransform.rotationDegrees.y;
+
+                if (lockPlayerFacingToCamera) {
+                    tickIntent.axes.x *= -1.0f;
+                }
+
+                moved |= vac::combat::applyFramedStrafeLocomotion(player,
+                                                                  tickIntent,
+                                                                  {movementYawDegrees},
+                                                                  lockPlayerFacingToCamera,
+                                                                  vac::combat::kFixedTickSeconds,
+                                                                  arena);
             }
 
             if (m_sparringIndex.has_value()) {

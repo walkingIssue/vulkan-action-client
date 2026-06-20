@@ -69,12 +69,12 @@ The viewer keeps running until the window is closed. Press Escape to close it fr
 Prototype controls:
 
 - `WASD` or XInput left stick moves the player.
-- Mouse rotates the player-follow camera.
-- Hold right mouse button to snap/lock player facing to the camera direction.
+- Mouse rotates the player-follow camera without changing player facing.
+- Hold right mouse button to lock player facing and movement to the camera direction.
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Player movement is camera-relative with strafing; mouse movement turns the camera independently, right mouse button locks facing to the camera, and backpedal snaps facing to camera direction at one-third forward speed.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. With free-look, player movement strafes relative to the character's current facing. With right mouse button held, movement becomes camera-relative and facing locks to the camera. Backpedal moves at one-third forward speed.
 
 ## Architecture Notes
 

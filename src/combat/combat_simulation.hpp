@@ -43,11 +43,11 @@ bool applyCharacterLocomotion(ActorState &actor,
                               ControlFrame idleControlFrame,
                               float deltaSeconds,
                               ArenaLimits arena);
-bool applyCameraRelativeLocomotion(ActorState &actor,
-                                   LocalMoveIntent intent,
-                                   ControlFrame cameraFrame,
-                                   bool lockFacingToCamera,
-                                   float deltaSeconds,
-                                   ArenaLimits arena);
+bool applyFramedStrafeLocomotion(ActorState &actor,
+                                 LocalMoveIntent intent,
+                                 ControlFrame movementFrame,
+                                 bool lockFacingToMovementFrame,
+                                 float deltaSeconds,
+                                 ArenaLimits arena);
 Transform interpolate(const ActorState &actor, float alpha);
 } // namespace vac::combat

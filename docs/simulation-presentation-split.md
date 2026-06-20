@@ -52,7 +52,7 @@ The simulation can produce compact presentation commands each tick. The renderer
 
 Movement speed belongs to combat state, not rendering. Inputs should be dimensionless intent such as "move northeast at full stick tilt"; the combat layer turns that into velocity using authored constants.
 
-The intent should carry an explicit frame conversion. Raw controls are local axes; character facing, camera yaw, or a lock-on target frame turns those axes into world-space movement when needed. For this prototype, player locomotion uses camera-relative strafing. The camera can freelook without rotating the player, right mouse button locks player facing to camera yaw, and backpedal always snaps facing to camera yaw so the character retreats toward the camera. That keeps "what the player meant" separate from "which way world +Z happens to be."
+The intent should carry an explicit frame conversion. Raw controls are local axes; character facing, camera yaw, or a lock-on target frame turns those axes into world-space movement when needed. For this prototype, the camera can freelook without rotating the player, so free-look movement uses the character's current facing frame. Holding right mouse button locks player facing and movement to camera yaw. That keeps "what the player meant" separate from "which way world +Z happens to be."
 
 For now the prototype uses world units per second:
 
