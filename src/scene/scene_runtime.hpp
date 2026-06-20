@@ -51,6 +51,8 @@ struct ProceduralInstance
     std::string name;
     std::string type;
     glm::vec2 size{1.0f};
+    glm::vec3 size3{1.0f};
+    glm::vec4 baseColor{0.7f, 0.7f, 0.7f, 1.0f};
     Transform transform;
     Bounds worldBounds;
 };

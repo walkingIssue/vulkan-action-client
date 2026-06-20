@@ -112,7 +112,7 @@ void appendFloor(SceneDrawData &drawData, const ProceduralInstance &floor)
     const glm::mat4 transform = makeTransformMatrix(floor.transform);
     const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
     const glm::vec3 normal = glm::normalize(normalMatrix * glm::vec3{0.0f, 1.0f, 0.0f});
-    const glm::vec3 color{0.20f, 0.22f, 0.24f};
+    const glm::vec3 color{floor.baseColor.x, floor.baseColor.y, floor.baseColor.z};
 
     auto tx = [&](glm::vec3 p) {
         return glm::vec3{transform * glm::vec4{p, 1.0f}};
@@ -137,6 +137,49 @@ void appendFloor(SceneDrawData &drawData, const ProceduralInstance &floor)
         appendLine(drawData, tx({t * floor.size.x, 0.015f, -half.y}), tx({t * floor.size.x, 0.015f, half.y}), gridColor);
         appendLine(drawData, tx({-half.x, 0.015f, t * floor.size.y}), tx({half.x, 0.015f, t * floor.size.y}), gridColor);
     }
+}
+
+void appendBox(SceneDrawData &drawData, const ProceduralInstance &box)
+{
+    const glm::vec3 half = box.size3 * 0.5f;
+    const glm::mat4 transform = makeTransformMatrix(box.transform);
+    const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform)));
+    const glm::vec3 color{box.baseColor.x, box.baseColor.y, box.baseColor.z};
+
+    auto tx = [&](glm::vec3 p) {
+        return glm::vec3{transform * glm::vec4{p, 1.0f}};
+    };
+    auto normal = [&](glm::vec3 n) {
+        return glm::normalize(normalMatrix * n);
+    };
+    auto tri = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 n) {
+        const glm::vec3 worldNormal = normal(n);
+        drawData.triangleVertices.push_back({tx(a), worldNormal, color});
+        drawData.triangleVertices.push_back({tx(b), worldNormal, color});
+        drawData.triangleVertices.push_back({tx(c), worldNormal, color});
+    };
+
+    const glm::vec3 lbf{-half.x, -half.y, -half.z};
+    const glm::vec3 rbf{half.x, -half.y, -half.z};
+    const glm::vec3 rbb{half.x, -half.y, half.z};
+    const glm::vec3 lbb{-half.x, -half.y, half.z};
+    const glm::vec3 ltf{-half.x, half.y, -half.z};
+    const glm::vec3 rtf{half.x, half.y, -half.z};
+    const glm::vec3 rtb{half.x, half.y, half.z};
+    const glm::vec3 ltb{-half.x, half.y, half.z};
+
+    tri(lbf, rtf, rbf, {0.0f, 0.0f, -1.0f});
+    tri(lbf, ltf, rtf, {0.0f, 0.0f, -1.0f});
+    tri(lbb, rbb, rtb, {0.0f, 0.0f, 1.0f});
+    tri(lbb, rtb, ltb, {0.0f, 0.0f, 1.0f});
+    tri(lbf, lbb, ltb, {-1.0f, 0.0f, 0.0f});
+    tri(lbf, ltb, ltf, {-1.0f, 0.0f, 0.0f});
+    tri(rbf, rtf, rtb, {1.0f, 0.0f, 0.0f});
+    tri(rbf, rtb, rbb, {1.0f, 0.0f, 0.0f});
+    tri(ltf, ltb, rtb, {0.0f, 1.0f, 0.0f});
+    tri(ltf, rtb, rtf, {0.0f, 1.0f, 0.0f});
+    tri(lbf, rbf, rbb, {0.0f, -1.0f, 0.0f});
+    tri(lbf, rbb, lbb, {0.0f, -1.0f, 0.0f});
 }
 } // namespace
 
@@ -183,6 +226,10 @@ SceneRenderData buildSceneRenderData(const SceneRuntime &scene)
         if (procedural.type == "floor") {
             appendFloor(staticDrawData, procedural);
             appendBounds(staticDrawData, procedural.worldBounds, {0.45f, 0.52f, 0.58f});
+        } else if (procedural.type == "box" || procedural.type == "actor_root" || procedural.type == "sphere" ||
+                   procedural.type == "capsule" || procedural.type == "cylinder") {
+            appendBox(staticDrawData, procedural);
+            appendBounds(staticDrawData, procedural.worldBounds, {0.95f, 0.90f, 0.56f});
         }
     }
     appendBounds(staticDrawData, scene.worldBounds, {0.40f, 0.95f, 0.72f});
