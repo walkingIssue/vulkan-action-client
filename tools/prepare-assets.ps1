@@ -20,3 +20,4 @@ if (-not (Test-Path $paladinObj)) {
 }
 
 Write-Host "Prepared: $paladinObj"
+$global:LASTEXITCODE = 0

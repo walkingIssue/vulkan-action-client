@@ -1,5 +1,30 @@
 $ErrorActionPreference = "Stop"
 
+function Get-UniquePathEntries {
+    param([Parameter(Mandatory = $true)][string[]]$Entries)
+
+    $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $unique = [System.Collections.Generic.List[string]]::new()
+    foreach ($entry in $Entries) {
+        if ([string]::IsNullOrWhiteSpace($entry)) {
+            continue
+        }
+
+        $trimmed = $entry.Trim()
+        if ($seen.Add($trimmed)) {
+            $unique.Add($trimmed)
+        }
+    }
+
+    return @($unique)
+}
+
+function Set-PathEntries {
+    param([Parameter(Mandatory = $true)][string[]]$Entries)
+
+    $env:Path = (Get-UniquePathEntries $Entries) -join ';'
+}
+
 function Add-PathEntry {
     param([Parameter(Mandatory = $true)][string]$PathEntry)
 
@@ -7,9 +32,9 @@ function Add-PathEntry {
         return
     }
 
-    $parts = $env:Path -split ';' | Where-Object { $_ -ne '' }
+    $parts = Get-UniquePathEntries ($env:Path -split ';')
     if ($parts -notcontains $PathEntry) {
-        $env:Path = "$PathEntry;$env:Path"
+        Set-PathEntries (@($PathEntry) + $parts)
     }
 }
 
@@ -28,7 +53,24 @@ if (-not (Test-Path $vcvars)) {
     throw "Could not find vcvars64.bat at $vcvars."
 }
 
-$envLines = cmd /c "`"$vcvars`" >nul && set"
+$originalPathEntries = Get-UniquePathEntries ($env:Path -split ';')
+$cleanPathEntries = @(
+    "$env:SystemRoot\System32",
+    $env:SystemRoot,
+    "$env:SystemRoot\System32\Wbem",
+    "$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+)
+
+$originalPath = $env:Path
+Set-PathEntries $cleanPathEntries
+$envLines = & cmd.exe /d /s /c "`"$vcvars`" >nul && set" 2>&1
+$vcvarsExitCode = $LASTEXITCODE
+$env:Path = $originalPath
+if ($vcvarsExitCode -ne 0) {
+    $details = ($envLines | ForEach-Object { $_.ToString() }) -join [Environment]::NewLine
+    throw "vcvars64.bat failed with exit code $vcvarsExitCode. $details"
+}
+
 foreach ($line in $envLines) {
     $equals = $line.IndexOf("=")
     if ($equals -gt 0) {
@@ -37,6 +79,8 @@ foreach ($line in $envLines) {
         [Environment]::SetEnvironmentVariable($name, $value, "Process")
     }
 }
+
+Set-PathEntries (($env:Path -split ';') + $originalPathEntries)
 
 $vulkanSdk = [Environment]::GetEnvironmentVariable("VULKAN_SDK", "Machine")
 if (-not $vulkanSdk -and (Test-Path "C:\VulkanSDK\1.4.350.0")) {
@@ -77,3 +121,4 @@ if ($workspaceTools) {
 Write-Host "MSVC, Ninja, Vulkan SDK, vcpkg, and asset tools environment ready."
 Write-Host "VULKAN_SDK=$env:VULKAN_SDK"
 Write-Host "VCPKG_ROOT=$env:VCPKG_ROOT"
+$global:LASTEXITCODE = 0
