@@ -1,8 +1,8 @@
 # SP1-004: AuthoringScene v0 and Primitive Map Schema
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-004-authoring-scene-v0
-Start commit: pending
+Start commit: `7aa00bb`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 4: Architectural Decisions
@@ -93,11 +93,19 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-003 characterization was merged.
+- 2026-06-20: Added `content_core`, map schema v1, canonical load/save, structured validation diagnostics, minimal runtime compile DTOs, valid/invalid fixtures, and CTest coverage.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-content` passed: 1/1 test.
+- `ctest --preset msvc-debug-unit` passed: 7/7 tests.
+- `ctest --preset msvc-debug-characterization` passed: 2/2 tests.
+- `ctest --preset msvc-debug` passed: 9/9 tests, including `network_e2e` and `viewer_smoke`.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `acd43be` Add SP1-004 authoring scene schema
