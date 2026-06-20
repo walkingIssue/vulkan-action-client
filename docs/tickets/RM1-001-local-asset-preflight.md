@@ -2,7 +2,7 @@
 
 Status: planned
 Branch: mitigation01/rm1-001-local-asset-preflight
-Start commit: pending
+Start commit: `48d2f74`
 Source plan: `docs/sprint-01-risk-mitigation-plan.md`
 Source result docs:
 - `docs/tickets/SP1-003-characterization_result.md`
