@@ -415,13 +415,10 @@ private:
             if (m_playerIndex.has_value()) {
                 vac::combat::ActorState &player = m_actorStates[*m_playerIndex];
                 vac::combat::LocalMoveIntent tickIntent = playerIntent;
+                tickIntent.axes.x *= -1.0f;
                 const float movementYawDegrees = lockPlayerFacingToCamera
                     ? m_cameraYawDegrees
                     : player.currentTransform.rotationDegrees.y;
-
-                if (lockPlayerFacingToCamera) {
-                    tickIntent.axes.x *= -1.0f;
-                }
 
                 moved |= vac::combat::applyFramedStrafeLocomotion(player,
                                                                   tickIntent,
