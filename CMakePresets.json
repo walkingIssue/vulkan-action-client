@@ -102,6 +102,26 @@
       }
     },
     {
+      "name": "msvc-debug-characterization",
+      "displayName": "MSVC Debug Characterization Tests",
+      "inherits": "msvc-debug",
+      "filter": {
+        "include": {
+          "label": "characterization"
+        }
+      }
+    },
+    {
+      "name": "msvc-debug-viewer",
+      "displayName": "MSVC Debug Viewer Smoke Tests",
+      "inherits": "msvc-debug",
+      "filter": {
+        "include": {
+          "label": "viewer"
+        }
+      }
+    },
+    {
       "name": "msvc-release",
       "displayName": "MSVC Release Tests",
       "configurePreset": "msvc-release",
