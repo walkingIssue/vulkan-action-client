@@ -1,6 +1,8 @@
 #include "render/scene_geometry.hpp"
 
 #include <array>
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -143,7 +145,7 @@ void appendFloor(SceneDrawData &drawData, const ProceduralInstance &floor)
     drawData.triangleVertices.push_back({d, normal, color});
 
     const glm::vec3 gridColor{0.36f, 0.39f, 0.42f};
-    const int divisions = 18;
+    const int divisions = std::clamp(static_cast<int>(std::ceil(std::max(floor.size.x, floor.size.y))), 18, 48);
     for (int i = 0; i <= divisions; ++i) {
         const float t = -0.5f + static_cast<float>(i) / static_cast<float>(divisions);
         appendLine(drawData, tx({t * floor.size.x, 0.015f, -half.y}), tx({t * floor.size.x, 0.015f, half.y}), gridColor);

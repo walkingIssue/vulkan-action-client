@@ -69,3 +69,4 @@ The viewer keeps running until the window is closed. Press Escape to close it fr
 ## Architecture Notes
 
 See `docs/simulation-presentation-split.md` for the intended split between authoritative gameplay simulation and visual presentation.
+See `docs/input-pipeline.md` for the intended path from platform input to fixed-tick combat commands.
