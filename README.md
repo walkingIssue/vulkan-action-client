@@ -88,7 +88,7 @@ Run the relay server and two optimistic clients:
 .\tools\start-network-clients.ps1
 ```
 
-Pass `-Clients 5` to launch five viewer processes. Each viewer owns one local actor and dynamically creates remote actors as peers connect. Add `-RandomIds` to assign unique random client ids for independent connection testing.
+Pass `-Clients 5` to launch five viewer processes. Each viewer owns one local actor and dynamically creates remote actors as peers connect. Add `-RandomIds` to assign unique random client ids for independent connection testing. The relay caches the latest actor snapshot per connected client so late joiners receive the current peer state instead of starting from only placeholder spawns.
 
 Or run the pieces manually:
 

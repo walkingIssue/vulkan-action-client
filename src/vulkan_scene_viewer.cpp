@@ -17,6 +17,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -235,6 +236,7 @@ private:
     vac::SceneRuntime m_scene;
     vac::SceneRenderData m_renderData;
     vac::SceneDrawData m_lineData;
+    std::optional<vac::SceneInstance> m_networkActorTemplate;
     std::vector<vac::combat::ActorState> m_actorStates;
     std::unique_ptr<vac::net::SnapshotClient> m_networkClient;
     std::unordered_map<uint8_t, size_t> m_networkActorByClientId;
@@ -445,16 +447,22 @@ private:
 
     void configureNetworkActors()
     {
-        if (m_playerIndex.has_value()) {
-            m_networkActorByClientId[1] = *m_playerIndex;
-        }
-        if (m_sparringIndex.has_value()) {
-            m_networkActorByClientId[2] = *m_sparringIndex;
-        }
-
         if (m_options.networkClientId == 0) {
+            if (m_playerIndex.has_value()) {
+                m_networkActorByClientId[1] = *m_playerIndex;
+            }
+            if (m_sparringIndex.has_value()) {
+                m_networkActorByClientId[2] = *m_sparringIndex;
+            }
             return;
         }
+
+        const size_t templateIndex = networkActorTemplateIndex();
+        m_networkActorTemplate = m_scene.instances[templateIndex];
+        m_scene.instances.clear();
+        m_playerIndex.reset();
+        m_sparringIndex.reset();
+        m_networkActorByClientId.clear();
 
         m_playerIndex = ensureNetworkActor(m_options.networkClientId);
     }
@@ -464,6 +472,14 @@ private:
         const auto actorIt = m_networkActorByClientId.find(clientId);
         if (actorIt != m_networkActorByClientId.end()) {
             return actorIt->second;
+        }
+
+        if (m_options.networkClientId != 0) {
+            if (clientId == m_options.networkClientId && m_playerIndex.has_value()) {
+                m_networkActorByClientId[clientId] = *m_playerIndex;
+                return *m_playerIndex;
+            }
+            return createNetworkActorInstance(clientId);
         }
 
         if (clientId == 1 && m_playerIndex.has_value()) {
@@ -480,6 +496,9 @@ private:
 
     size_t networkActorTemplateIndex() const
     {
+        if (m_networkActorTemplate.has_value()) {
+            return 0;
+        }
         if (m_playerIndex.has_value()) {
             return *m_playerIndex;
         }
@@ -491,6 +510,15 @@ private:
         }
 
         throw std::runtime_error("Cannot create network actor without a model instance template");
+    }
+
+    const vac::SceneInstance &networkActorTemplate() const
+    {
+        if (m_networkActorTemplate.has_value()) {
+            return *m_networkActorTemplate;
+        }
+
+        return m_scene.instances[networkActorTemplateIndex()];
     }
 
     vac::Transform networkSpawnTransform(uint8_t clientId, const vac::Transform &templateTransform) const
@@ -513,8 +541,7 @@ private:
 
     size_t createNetworkActorInstance(uint8_t clientId)
     {
-        const size_t templateIndex = networkActorTemplateIndex();
-        vac::SceneInstance instance = m_scene.instances[templateIndex];
+        vac::SceneInstance instance = networkActorTemplate();
         instance.id = fmt::format("network_client_{}", clientId);
         instance.name = fmt::format("Network Client {}", clientId);
         instance.transform = networkSpawnTransform(clientId, instance.transform);
@@ -536,6 +563,44 @@ private:
 
         spdlog::info("Created network actor {} for client {}", instance.id, clientId);
         return actorIndex;
+    }
+
+    void removeNetworkActor(uint8_t clientId)
+    {
+        if (clientId == m_options.networkClientId) {
+            return;
+        }
+
+        const auto actorIt = m_networkActorByClientId.find(clientId);
+        if (actorIt == m_networkActorByClientId.end()) {
+            return;
+        }
+
+        const size_t actorIndex = actorIt->second;
+        m_networkActorByClientId.erase(actorIt);
+
+        if (actorIndex < m_scene.instances.size()) {
+            m_scene.instances.erase(m_scene.instances.begin() + static_cast<std::ptrdiff_t>(actorIndex));
+        }
+        if (actorIndex < m_actorStates.size()) {
+            m_actorStates.erase(m_actorStates.begin() + static_cast<std::ptrdiff_t>(actorIndex));
+        }
+
+        for (auto &[mappedClientId, mappedActorIndex] : m_networkActorByClientId) {
+            (void)mappedClientId;
+            if (mappedActorIndex > actorIndex) {
+                --mappedActorIndex;
+            }
+        }
+
+        if (m_playerIndex.has_value() && *m_playerIndex > actorIndex) {
+            --(*m_playerIndex);
+        }
+
+        vac::refreshSceneBounds(m_scene);
+        m_lineData = vac::buildSceneLineData(m_scene);
+        m_lineGeometryDirty = true;
+        spdlog::info("Removed network actor for client {}", clientId);
     }
 
     void initializeNetworkClient()
@@ -567,6 +632,8 @@ private:
             spdlog::info("Network peer {} {}", event.clientId, eventLabel);
             if (event.event == vac::net::ServerEventKind::clientConnected && event.clientId != m_options.networkClientId) {
                 ensureNetworkActor(event.clientId);
+            } else if (event.event == vac::net::ServerEventKind::clientDisconnected) {
+                removeNetworkActor(event.clientId);
             }
         }
 

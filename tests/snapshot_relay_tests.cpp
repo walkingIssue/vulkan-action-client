@@ -76,6 +76,23 @@ bool hasEventFor(const vac::net::RelayResult &result,
     }
     return false;
 }
+
+bool hasSnapshotFor(const vac::net::RelayResult &result,
+                    std::string_view endpointKey,
+                    uint8_t clientId,
+                    uint16_t tick)
+{
+    for (const vac::net::RelayOutput &output : result.outputs) {
+        const std::optional<vac::net::ActorSnapshot> decoded = actorSnapshot(output);
+        if (output.endpointKey == endpointKey &&
+            decoded.has_value() &&
+            decoded->clientId == clientId &&
+            decoded->tick == tick) {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace
 
 int main()
@@ -129,12 +146,30 @@ int main()
         acceptedSnapshot.outputs.empty() ? std::nullopt : actorSnapshot(acceptedSnapshot.outputs.front());
     expect(forwardedSnapshot.has_value() && forwardedSnapshot->clientId == 1 && forwardedSnapshot->tick == 3,
            "snapshot fanout keeps original actor payload");
+    expect(relay.latestSnapshotForClient(1).has_value(), "relay caches accepted snapshots");
+
+    const vac::net::RelayResult thirdConnect =
+        relay.ingest("endpoint-c", vac::net::encodeConnectPacket({3, 40}));
+    expect(thirdConnect.accepted, "late client connect is accepted");
+    expect(hasEventFor(thirdConnect,
+                       "endpoint-c",
+                       vac::net::ServerEventKind::clientConnected,
+                       1),
+           "late client receives existing peer connect event");
+    expect(hasSnapshotFor(thirdConnect, "endpoint-c", 1, 3),
+           "late client receives cached world snapshot for existing peer");
+    expect(hasEventFor(thirdConnect,
+                       "endpoint-a",
+                       vac::net::ServerEventKind::clientConnected,
+                       3),
+           "existing peer receives late-client connect event");
 
     const vac::net::RelayResult disconnect =
         relay.ingest("endpoint-a", vac::net::encodeDisconnectPacket({1, 30}));
     expect(disconnect.accepted, "disconnect from owning endpoint is accepted");
-    expect(relay.clientCount() == 1, "disconnect removes one session");
+    expect(relay.clientCount() == 2, "disconnect removes one session");
     expect(!relay.hasClient(1), "disconnected client id is removed");
+    expect(!relay.latestSnapshotForClient(1).has_value(), "disconnect removes cached world snapshot");
     expect(hasEventFor(disconnect,
                        "endpoint-b",
                        vac::net::ServerEventKind::clientDisconnected,

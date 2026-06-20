@@ -62,6 +62,11 @@ RelayResult SnapshotRelay::ingest(const std::string &endpointKey, std::span<cons
                               ServerEventKind::clientConnected,
                               peer.clientId,
                               peer.lastSequence);
+            const auto snapshotIt = m_latestSnapshotsByClientId.find(peer.clientId);
+            if (snapshotIt != m_latestSnapshotsByClientId.end()) {
+                result.outputs.push_back({endpointKey, encodeActorSnapshot(snapshotIt->second)});
+            }
+
             fanOutServerEvent(result.outputs,
                               peer.endpointKey,
                               ServerEventKind::clientConnected,
@@ -98,6 +103,7 @@ RelayResult SnapshotRelay::ingest(const std::string &endpointKey, std::span<cons
         }
 
         m_clientsById[snapshot->clientId].lastSequence = snapshot->tick;
+        m_latestSnapshotsByClientId[snapshot->clientId] = *snapshot;
         for (const auto &[clientId, session] : m_clientsById) {
             if (clientId == snapshot->clientId) {
                 continue;
@@ -126,6 +132,15 @@ std::optional<std::string> SnapshotRelay::endpointForClient(uint8_t clientId) co
     return clientIt->second.endpointKey;
 }
 
+std::optional<ActorSnapshot> SnapshotRelay::latestSnapshotForClient(uint8_t clientId) const
+{
+    const auto snapshotIt = m_latestSnapshotsByClientId.find(clientId);
+    if (snapshotIt == m_latestSnapshotsByClientId.end()) {
+        return std::nullopt;
+    }
+    return snapshotIt->second;
+}
+
 bool SnapshotRelay::endpointOwnsClient(const std::string &endpointKey, uint8_t clientId) const
 {
     const auto endpointIt = m_clientIdByEndpoint.find(endpointKey);
@@ -141,6 +156,7 @@ void SnapshotRelay::removeEndpoint(const std::string &endpointKey)
 
     const uint8_t clientId = endpointIt->second;
     m_clientIdByEndpoint.erase(endpointIt);
+    m_latestSnapshotsByClientId.erase(clientId);
 
     const auto clientIt = m_clientsById.find(clientId);
     if (clientIt != m_clientsById.end() && clientIt->second.endpointKey == endpointKey) {
@@ -156,6 +172,7 @@ void SnapshotRelay::removeClient(uint8_t clientId)
     }
 
     m_clientIdByEndpoint.erase(clientIt->second.endpointKey);
+    m_latestSnapshotsByClientId.erase(clientId);
     m_clientsById.erase(clientIt);
 }
 } // namespace vac::net

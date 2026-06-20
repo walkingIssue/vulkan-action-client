@@ -33,6 +33,7 @@ public:
     size_t clientCount() const { return m_clientsById.size(); }
     bool hasClient(uint8_t clientId) const;
     std::optional<std::string> endpointForClient(uint8_t clientId) const;
+    std::optional<ActorSnapshot> latestSnapshotForClient(uint8_t clientId) const;
 
 private:
     struct ClientSession
@@ -48,5 +49,6 @@ private:
 
     std::unordered_map<uint8_t, ClientSession> m_clientsById;
     std::unordered_map<std::string, uint8_t> m_clientIdByEndpoint;
+    std::unordered_map<uint8_t, ActorSnapshot> m_latestSnapshotsByClientId;
 };
 } // namespace vac::net

@@ -2,7 +2,7 @@
 
 This slice is a UDP relay, not an authoritative server.
 
-Clients simulate and render optimistically. Each client owns one actor, sends compact snapshots of that actor every fixed tick, and applies remote snapshots as presentation state for the other actor. The server learns client endpoints through explicit connect packets and fans validated packets out to the other clients. There are no acks, no resends, no rollback, and no server-side combat decisions yet.
+Clients simulate and render optimistically. Each client owns one actor, sends compact snapshots of that actor every fixed tick, and applies remote snapshots as presentation state for peer actors. The server learns client endpoints through explicit connect packets, stores the latest accepted actor snapshot per client, and fans validated packets out to the other clients. There are no acks, no resends, no rollback, and no server-side combat decisions yet.
 Clients now enter the relay through an explicit connect packet and leave through an explicit disconnect packet. Actor snapshots are accepted only from the endpoint that owns the snapshot client id.
 
 ## Current Flow
@@ -25,7 +25,7 @@ client 2 fixed tick
   -> DisconnectPacket on shutdown
 ```
 
-The relay can track any number of connected client ids. The current viewer only has render mappings for client id `1`, which owns `player_preview`, and client id `2`, which owns `sparring_partner`. In network mode, the old local arrow-key sparring control is disabled so the remote actor is driven by received packets.
+The relay can track any number of connected client ids. In network mode, the viewer treats the bootstrap character instances as model templates. It creates one actor for the local client id and materializes remote actors only when server connect events or snapshots arrive. Disconnected peers are removed from the local presentation scene.
 
 ## Packet
 
@@ -74,6 +74,17 @@ sequence: 16 bits
 Server events currently announce peer connect and disconnect.
 
 The codec writes fields manually through a bit writer. It does not send compiler-packed structs.
+
+## Server World Cache
+
+The relay keeps the latest accepted `ActorSnapshot` for each connected client. When a new client connects, the server sends:
+
+```text
+ServerEventPacket(clientConnected existing-peer)
+ActorSnapshot(latest existing-peer state, if available)
+```
+
+to the new client for each existing peer. Existing peers receive `clientConnected` for the new client and then continue receiving normal snapshot fanout as soon as the new client publishes movement. Disconnect removes both the session and the cached snapshot for that client.
 
 ## Why This Shape
 
