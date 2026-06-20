@@ -15,13 +15,15 @@ This file is a stop sign, not a work ticket.
 
 ## Current Correct Work
 
-The currently defined implementation track is still Sprint 01:
+The currently defined implementation track is still Sprint 01. The current safe reading of `main` is:
 
-1. `SP1-001` through `SP1-008` are merged.
-2. `SP1-009`: Proxy animation, keyframes, and interpolation is the active in-flight ticket branch.
-3. `SP1-010`: Combat scenario runner and golden traces is the next defined implementation ticket after `SP1-009` is verified and merged.
+1. `SP1-001` through `SP1-010` are merged.
+2. `SP1-012`: Command-script map wireframing is merged.
+3. `SP1-011`: Visual map and combat lab is the active defined implementation lane that still needs completion.
 
 If an agent is looking for the next task, it should use `docs/sprint-01-implementation-plan.md` and the committed ticket/result documents under `docs/tickets/`, not this `SP2-001` placeholder.
+
+Do not infer a Sprint 02 kickoff from the `SP2-001` label. The next actionable work is the unfinished Sprint 01 visual lab track unless a newer committed Sprint 02 plan explicitly supersedes this guardrail.
 
 ## Before Starting SP2-001
 
