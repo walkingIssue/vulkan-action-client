@@ -88,6 +88,8 @@ Run the relay server and two optimistic clients:
 .\tools\start-network-clients.ps1
 ```
 
+Pass `-Clients 5` to launch five viewer processes. Each viewer owns one local actor and dynamically creates remote actors as peers connect.
+
 Or run the pieces manually:
 
 ```powershell

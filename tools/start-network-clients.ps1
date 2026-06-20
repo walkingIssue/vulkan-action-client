@@ -4,8 +4,10 @@ param(
 
     [int]$Port = 40000,
 
-    [ValidateRange(1, 2)]
+    [ValidateRange(1, 255)]
     [int]$Clients = 2,
+
+    [int]$Frames = 0,
 
     [switch]$NoServer
 )
@@ -65,8 +67,13 @@ for ($clientId = 1; $clientId -le $Clients; ++$clientId) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $clientOut = Join-Path $logDir "client$clientId-$stamp.out.log"
     $clientErr = Join-Path $logDir "client$clientId-$stamp.err.log"
+    $clientArgs = @("--net-client-id", $clientId.ToString(), "--net-server", $serverEndpoint)
+    if ($Frames -gt 0) {
+        $clientArgs += @("--frames", $Frames.ToString())
+    }
+
     $client = Start-Process -FilePath $viewerExe `
-        -ArgumentList @("--net-client-id", $clientId.ToString(), "--net-server", $serverEndpoint) `
+        -ArgumentList $clientArgs `
         -WorkingDirectory $buildDir `
         -RedirectStandardOutput $clientOut `
         -RedirectStandardError $clientErr `

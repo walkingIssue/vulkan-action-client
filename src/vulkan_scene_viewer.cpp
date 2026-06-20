@@ -204,10 +204,11 @@ public:
     {
         loadInitialControlProfile();
         m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
-        m_renderData = vac::buildSceneRenderData(m_scene);
-        m_lineData = vac::buildSceneLineData(m_scene);
         findControllableActors();
         configureNetworkActors();
+        vac::refreshSceneBounds(m_scene);
+        m_renderData = vac::buildSceneRenderData(m_scene);
+        m_lineData = vac::buildSceneLineData(m_scene);
         initializeCombatActors();
         initializeCameraAnchor();
         initializeNetworkClient();
@@ -455,12 +456,86 @@ private:
             return;
         }
 
-        const auto localActor = m_networkActorByClientId.find(m_options.networkClientId);
-        if (localActor == m_networkActorByClientId.end()) {
-            throw std::runtime_error(fmt::format("No actor mapping for network client {}", m_options.networkClientId));
+        m_playerIndex = ensureNetworkActor(m_options.networkClientId);
+    }
+
+    size_t ensureNetworkActor(uint8_t clientId)
+    {
+        const auto actorIt = m_networkActorByClientId.find(clientId);
+        if (actorIt != m_networkActorByClientId.end()) {
+            return actorIt->second;
         }
 
-        m_playerIndex = localActor->second;
+        if (clientId == 1 && m_playerIndex.has_value()) {
+            m_networkActorByClientId[clientId] = *m_playerIndex;
+            return *m_playerIndex;
+        }
+        if (clientId == 2 && m_sparringIndex.has_value()) {
+            m_networkActorByClientId[clientId] = *m_sparringIndex;
+            return *m_sparringIndex;
+        }
+
+        return createNetworkActorInstance(clientId);
+    }
+
+    size_t networkActorTemplateIndex() const
+    {
+        if (m_playerIndex.has_value()) {
+            return *m_playerIndex;
+        }
+        if (m_sparringIndex.has_value()) {
+            return *m_sparringIndex;
+        }
+        if (!m_scene.instances.empty()) {
+            return 0;
+        }
+
+        throw std::runtime_error("Cannot create network actor without a model instance template");
+    }
+
+    vac::Transform networkSpawnTransform(uint8_t clientId, const vac::Transform &templateTransform) const
+    {
+        vac::Transform transform = templateTransform;
+        const uint8_t ordinal = clientId > 2u ? static_cast<uint8_t>(clientId - 3u) : static_cast<uint8_t>(clientId - 1u);
+        const uint8_t slot = static_cast<uint8_t>(ordinal % 8u);
+        const uint8_t ring = static_cast<uint8_t>(ordinal / 8u);
+        const float angle = glm::radians(static_cast<float>(slot) * 45.0f);
+        const float radius = 18.0f + static_cast<float>(ring) * 12.0f;
+        transform.translation.x = std::sin(angle) * radius;
+        transform.translation.z = std::cos(angle) * radius;
+
+        const glm::vec2 towardCenter{-transform.translation.x, -transform.translation.z};
+        if (glm::dot(towardCenter, towardCenter) > 0.0001f) {
+            transform.rotationDegrees.y = glm::degrees(std::atan2(towardCenter.x, towardCenter.y));
+        }
+        return transform;
+    }
+
+    size_t createNetworkActorInstance(uint8_t clientId)
+    {
+        const size_t templateIndex = networkActorTemplateIndex();
+        vac::SceneInstance instance = m_scene.instances[templateIndex];
+        instance.id = fmt::format("network_client_{}", clientId);
+        instance.name = fmt::format("Network Client {}", clientId);
+        instance.transform = networkSpawnTransform(clientId, instance.transform);
+
+        m_scene.instances.push_back(instance);
+        const size_t actorIndex = m_scene.instances.size() - 1;
+        m_networkActorByClientId[clientId] = actorIndex;
+        vac::refreshSceneBounds(m_scene);
+
+        if (!m_actorStates.empty()) {
+            vac::combat::ActorState actor;
+            actor.previousTransform = instance.transform;
+            actor.currentTransform = instance.transform;
+            m_actorStates.push_back(actor);
+            applyControlProfileToActors();
+            m_lineData = vac::buildSceneLineData(m_scene);
+            m_lineGeometryDirty = true;
+        }
+
+        spdlog::info("Created network actor {} for client {}", instance.id, clientId);
+        return actorIndex;
     }
 
     void initializeNetworkClient()
@@ -490,15 +565,18 @@ private:
                 ? "connected"
                 : "disconnected";
             spdlog::info("Network peer {} {}", event.clientId, eventLabel);
+            if (event.event == vac::net::ServerEventKind::clientConnected && event.clientId != m_options.networkClientId) {
+                ensureNetworkActor(event.clientId);
+            }
         }
 
         for (const vac::net::ActorSnapshot &snapshot : batch.snapshots) {
-            const auto actorIt = m_networkActorByClientId.find(snapshot.clientId);
-            if (actorIt == m_networkActorByClientId.end() || actorIt->second >= m_actorStates.size()) {
+            const size_t actorIndex = ensureNetworkActor(snapshot.clientId);
+            if (actorIndex >= m_actorStates.size()) {
                 continue;
             }
 
-            vac::combat::ActorState &actor = m_actorStates[actorIt->second];
+            vac::combat::ActorState &actor = m_actorStates[actorIndex];
             actor.previousTransform = actor.currentTransform;
             actor.currentTransform.translation = snapshot.position;
             actor.currentTransform.rotationDegrees.y = snapshot.yawDegrees;
