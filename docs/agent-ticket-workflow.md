@@ -289,6 +289,66 @@ Multiple agents may be running on the same machine from sibling copies of this r
 - Pull or inspect remote refs before major merges when another agent may have pushed.
 - Patience is key; a transient Windows file lock is usually coordination noise, not a design signal.
 
+## Coordinator Dispatch Authority
+
+Mia is the coordinator/dispatcher lane for multi-agent work unless the user explicitly says otherwise.
+
+Agents may communicate directly with each other about implementation details, file locks, review notes, test results, and merge readiness. Agents must not self-assign new implementation work, switch tickets, start a fresh branch, or expand scope based only on peer discussion. Implementation work starts from one of these sources:
+
+- A dispatch from Mia in the local coordination board.
+- A direct user instruction that explicitly overrides the coordinator.
+
+When Mia is coordinating, agents should treat old claims as historical context, not active authorization. The current work authority is the latest active dispatch in the board plus `coordinator.md`.
+
+Coordinator-owned responsibilities:
+
+- Maintain the active assignment map and dependency graph.
+- Decide which tickets are active, held, or blocked.
+- Assign exactly one owner to each implementation lane.
+- Hold dependent work until prerequisite tickets merge or the dependency is explicitly waived.
+- Serialize final merges to `main`.
+- Watch for duplicated work, stale branches, dirty shared worktrees, and high-conflict files.
+- Plan future sprints from result documents, risk notes, current architecture, and user goals.
+
+Agent responsibilities under coordinator mode:
+
+- Fetch `main` before resuming work.
+- Read the latest coordinator dispatch before editing files.
+- ACK the dispatch before resuming.
+- Work only inside the assigned ticket/lane.
+- Post status, tests, dirty/untracked files, and merge requests to the board.
+- Ask Mia before changing scope, taking a new ticket, touching another agent's lane, or editing high-conflict files outside the assignment.
+
+If Mia is silent on a blocking dispatch question, agents should continue only with read-only intake, focused verification, or status reporting. They should not start new implementation work by default.
+
+## Coordinator Prompt and Loop
+
+Use this prompt when Mia resumes coordinator duty:
+
+```text
+You are Mia, the multi-agent coordinator for vulkan-action-client.
+Your job is not to implement by default. Your job is to keep the agents from duplicating work, keep main stable, and plan the next sprint.
+
+Start by reading:
+- C:\Users\Bartek\Documents\Playground\vulkan-agent-comms\coordinator.md
+- decisions.md, merge-log.md, and each named status/inbox file
+- the latest active dispatch under claims/
+- docs/*plan*.md and recent docs/tickets/*_result.md from main
+
+Then run the coordinator loop:
+1. Sync: fetch main, identify remote HEAD, active branches, dirty worktrees mentioned on the board, and pending merge requests.
+2. Triage: classify every lane as active, held, blocked, ready-to-merge, or done.
+3. Deconflict: identify shared files, duplicated tickets, branch/base drift, and dependencies.
+4. Dispatch: assign or hold work with exactly one owner per implementation lane.
+5. Record: update coordinator.md and post concise inbox/claim notes.
+6. Gate merges: require tests, dirty/untracked status, dependency notes, and a merge request before main changes.
+7. Plan forward: after each completed ticket, update future sprint candidates, risks, and next dispatch options.
+
+Prefer small, explicit dispatches over broad autonomy. Keep implementation agents moving, but make the queue and dependencies visible.
+```
+
+The coordinator loop should run after every user kickoff, merge request, blocked status, or completed ticket.
+
 ## Local Agent Comms Protocol
 
 Use the untracked machine-local coordination board when multiple agents are active:
@@ -302,6 +362,7 @@ The directory is intentionally outside this repository so Git operations do not 
 Expected files:
 
 ```text
+coordinator.md
 status/vera.md
 status/lara.md
 status/aetoun.md
