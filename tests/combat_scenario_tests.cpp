@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <stdexcept>
@@ -105,6 +106,30 @@ nlohmann::json readJsonFile(const std::filesystem::path &path)
     return document;
 }
 
+std::string readTextFile(const std::filesystem::path &path)
+{
+    std::ifstream input{path, std::ios::binary};
+    if (!input) {
+        throw std::runtime_error("Could not open text fixture " + path.string());
+    }
+
+    return std::string{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+}
+
+void writeTextFile(const std::filesystem::path &path, std::string_view text)
+{
+    std::ofstream output{path, std::ios::binary | std::ios::trunc};
+    if (!output) {
+        throw std::runtime_error("Could not write text fixture " + path.string());
+    }
+    output.write(text.data(), static_cast<std::streamsize>(text.size()));
+}
+
+std::filesystem::path temporaryGoldenPath(std::string_view suffix)
+{
+    return std::filesystem::temp_directory_path() / ("vac_sp2_003_" + std::string{suffix} + ".golden.json");
+}
+
 std::filesystem::path writeCharacterDefinitionFixture(const nlohmann::json &document, std::string_view suffix)
 {
     const std::filesystem::path outputPath =
@@ -158,6 +183,88 @@ void guardedGoldenUpdateRequiresExplicitPermission()
     expect(!result.goldenMatched, "unguarded golden update does not report matched");
 }
 
+void normalScenarioRunDoesNotRewriteCheckedInGolden()
+{
+    const std::filesystem::path goldenPath =
+        projectRoot() / "tests/fixtures/scenarios/goldens/sword_light_hits_idle_target.golden.json";
+    const std::string before = readTextFile(goldenPath);
+
+    const vac::combat::ScenarioRunResult result = runScenario("sword_light_hits_idle_target.scenario.json");
+
+    expect(result.status == "ok", "normal scenario run exits ok");
+    expect(result.goldenCompared && result.goldenMatched, "normal scenario run compares golden");
+    expect(readTextFile(goldenPath) == before, "normal scenario run does not rewrite checked-in golden");
+}
+
+void goldenUpdateRequiresCommandOptionAndDoesNotRewrite()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    const std::filesystem::path mismatchGolden =
+        projectRoot() / "tests/fixtures/scenarios/goldens/sword_light_whiffs.golden.json";
+    const std::string originalGolden = readTextFile(mismatchGolden);
+    const std::filesystem::path temporaryGolden = temporaryGoldenPath("missing_update_option");
+    writeTextFile(temporaryGolden, originalGolden);
+    scenario.goldenPath = temporaryGolden;
+
+    vac::combat::ScenarioRunOptions options;
+    options.allowGoldenUpdate = true;
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario), options);
+
+    expect(result.status == "error", "environment permission without update option still compares golden");
+    expect(result.message == "Golden trace mismatch", "missing update option reports mismatch");
+    expect(readTextFile(temporaryGolden) == originalGolden, "missing update option does not rewrite golden");
+    std::filesystem::remove(temporaryGolden);
+}
+
+void goldenUpdateRequiresEnvironmentPermissionAndDoesNotRewrite()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    const std::filesystem::path mismatchGolden =
+        projectRoot() / "tests/fixtures/scenarios/goldens/sword_light_whiffs.golden.json";
+    const std::string originalGolden = readTextFile(mismatchGolden);
+    const std::filesystem::path temporaryGolden = temporaryGoldenPath("missing_environment_gate");
+    writeTextFile(temporaryGolden, originalGolden);
+    scenario.goldenPath = temporaryGolden;
+
+    vac::combat::ScenarioRunOptions options;
+    options.updateGolden = true;
+    options.allowGoldenUpdate = false;
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario), options);
+
+    expect(result.status == "error", "update option without environment permission fails");
+    expect(result.message == "Golden update requires --update-golden and VAC_UPDATE_GOLDENS=1",
+           "missing environment permission reports gate");
+    expect(readTextFile(temporaryGolden) == originalGolden, "missing environment permission does not rewrite golden");
+    std::filesystem::remove(temporaryGolden);
+}
+
+void guardedGoldenUpdateCanRewriteTemporaryGolden()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    const std::filesystem::path mismatchGolden =
+        projectRoot() / "tests/fixtures/scenarios/goldens/sword_light_whiffs.golden.json";
+    const std::string originalGolden = readTextFile(mismatchGolden);
+    const std::filesystem::path temporaryGolden = temporaryGoldenPath("allowed_update");
+    writeTextFile(temporaryGolden, originalGolden);
+    scenario.goldenPath = temporaryGolden;
+
+    vac::combat::ScenarioRunOptions options;
+    options.updateGolden = true;
+    options.allowGoldenUpdate = true;
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario), options);
+
+    expect(result.status == "ok", "fully guarded golden update exits ok");
+    expect(result.goldenCompared && result.goldenMatched, "fully guarded golden update reports matched");
+    expect(readTextFile(temporaryGolden) != originalGolden, "fully guarded golden update rewrites temporary golden");
+    expect(vac::combat::toJson(vac::combat::loadGoldenTraceFile(temporaryGolden)) ==
+               vac::combat::toJson(result.trace),
+           "fully guarded golden update writes actual trace");
+    std::filesystem::remove(temporaryGolden);
+}
+
 void goldenMismatchReportsExpectedAndActual()
 {
     vac::combat::CombatScenario scenario =
@@ -172,6 +279,16 @@ void goldenMismatchReportsExpectedAndActual()
         expect(message.find("expected=") != std::string::npos, "mismatch diagnostic includes expected event");
         expect(message.find("actual=") != std::string::npos, "mismatch diagnostic includes actual event");
         expect(message.find("tick") != std::string::npos, "mismatch diagnostic includes tick context");
+        expect(message.find("\"damage\":12") != std::string::npos,
+               "mismatch diagnostic includes damage field");
+        expect(message.find("\"targetRemainingHealth\":88") != std::string::npos,
+               "mismatch diagnostic includes remaining health field");
+        expect(message.find("\"reactionMove\":\"move.hit_reaction\"") != std::string::npos,
+               "mismatch diagnostic includes reaction move field");
+        expect(message.find("\"hitstopTicks\":1") != std::string::npos,
+               "mismatch diagnostic includes hitstop field");
+        expect(message.find("\"stunTicks\":3") != std::string::npos,
+               "mismatch diagnostic includes stun field");
     }
 }
 
@@ -379,6 +496,10 @@ int main()
         goldenScenariosMatch();
         repeatedRunsAreDeterministic();
         guardedGoldenUpdateRequiresExplicitPermission();
+        normalScenarioRunDoesNotRewriteCheckedInGolden();
+        goldenUpdateRequiresCommandOptionAndDoesNotRewrite();
+        goldenUpdateRequiresEnvironmentPermissionAndDoesNotRewrite();
+        guardedGoldenUpdateCanRewriteTemporaryGolden();
         goldenMismatchReportsExpectedAndActual();
         missingContentPathsReportStructuredDiagnostics();
         characterDefinitionsDriveActorDefaults();
