@@ -15,6 +15,7 @@ find_package(Stb REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 add_library(scene_core
+    src/render/scene_geometry.cpp
     src/scene/scene_runtime.cpp
 )
 
@@ -31,6 +32,22 @@ target_link_libraries(scene_core PUBLIC
     nlohmann_json::nlohmann_json
     spdlog::spdlog
 )
+
+function(add_shader TARGET_NAME SOURCE_FILE)
+    set(OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/shaders/${TARGET_NAME}.spv")
+    add_custom_command(
+        OUTPUT "${OUTPUT_FILE}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/shaders"
+        COMMAND Vulkan::glslc "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE}" -o "${OUTPUT_FILE}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE}"
+        VERBATIM
+    )
+    add_custom_target(${TARGET_NAME}_shader DEPENDS "${OUTPUT_FILE}")
+    set(${TARGET_NAME}_SPV "${OUTPUT_FILE}" PARENT_SCOPE)
+endfunction()
+
+add_shader(scene_vert shaders/scene.vert)
+add_shader(scene_frag shaders/scene.frag)
 
 add_executable(toolchain_probe
     src/toolchain_probe.cpp
@@ -67,4 +84,30 @@ target_compile_definitions(scene_probe PRIVATE
 
 target_link_libraries(scene_probe PRIVATE
     scene_core
+)
+
+add_executable(vulkan_scene_viewer
+    src/vulkan_scene_viewer.cpp
+)
+
+add_dependencies(vulkan_scene_viewer
+    scene_vert_shader
+    scene_frag_shader
+)
+
+target_compile_features(vulkan_scene_viewer PRIVATE cxx_std_20)
+
+target_compile_definitions(vulkan_scene_viewer PRIVATE
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+    VULKAN_ACTION_CLIENT_SCENE_VERT_SPV="${scene_vert_SPV}"
+    VULKAN_ACTION_CLIENT_SCENE_FRAG_SPV="${scene_frag_SPV}"
+)
+
+target_link_libraries(vulkan_scene_viewer PRIVATE
+    scene_core
+    Vulkan::Vulkan
+    fmt::fmt
+    glfw
+    glm::glm
+    spdlog::spdlog
 )
