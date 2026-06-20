@@ -55,3 +55,17 @@ The first scene uses a procedural floor plus character instances because no envi
 cmake --build --preset msvc-debug
 .\build\msvc-debug\scene_probe.exe
 ```
+
+## Scene Viewer
+
+Build and run the Vulkan scene viewer:
+
+```powershell
+.\tools\run-scene-viewer.ps1
+```
+
+The viewer keeps running until the window is closed. Press Escape to close it from the keyboard. By default the camera orbits the bootstrap scene; pass `--static-camera` to hold the camera still, or `--frames 3` for a short smoke test.
+
+## Architecture Notes
+
+See `docs/simulation-presentation-split.md` for the intended split between authoritative gameplay simulation and visual presentation.

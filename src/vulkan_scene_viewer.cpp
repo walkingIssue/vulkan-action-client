@@ -45,6 +45,7 @@ struct ViewerOptions
 {
     std::filesystem::path scenePath;
     uint32_t frames = 0;
+    bool orbitCamera = true;
 };
 
 struct QueueFamilyIndices
@@ -103,6 +104,8 @@ ViewerOptions parseOptions(int argc, char **argv)
             options.scenePath = argv[++i];
         } else if (arg == "--frames" && i + 1 < argc) {
             options.frames = static_cast<uint32_t>(std::max(0, std::stoi(argv[++i])));
+        } else if (arg == "--static-camera") {
+            options.orbitCamera = false;
         }
     }
 
@@ -183,6 +186,7 @@ private:
     std::vector<VkFence> m_inFlightFences;
     std::vector<VkFence> m_imagesInFlight;
     size_t m_currentFrame = 0;
+    float m_sceneTimeSeconds = 0.0f;
     bool m_framebufferResized = false;
 
     static void framebufferResizeCallback(GLFWwindow *window, int, int)
@@ -245,6 +249,12 @@ private:
 
         while (!glfwWindowShouldClose(m_window)) {
             glfwPollEvents();
+            if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+                glfwSetWindowShouldClose(m_window, GLFW_TRUE);
+            }
+
+            const auto now = std::chrono::steady_clock::now();
+            m_sceneTimeSeconds = std::chrono::duration<float>(now - start).count();
             drawFrame();
 
             if (m_options.frames > 0 && ++frameCount >= m_options.frames) {
@@ -991,7 +1001,15 @@ private:
         const glm::vec3 center = m_scene.worldBounds.valid
             ? (m_scene.worldBounds.min + m_scene.worldBounds.max) * 0.5f
             : glm::vec3{0.0f, 4.0f, 0.0f};
-        const glm::vec3 eye = center + glm::vec3{11.0f, 8.0f, 16.0f};
+
+        glm::vec3 cameraOffset{11.0f, 8.0f, 16.0f};
+        if (m_options.orbitCamera) {
+            const float orbitRadians = m_sceneTimeSeconds * 0.22f;
+            const glm::mat4 orbit = glm::rotate(glm::mat4{1.0f}, orbitRadians, glm::vec3{0.0f, 1.0f, 0.0f});
+            cameraOffset = glm::vec3{orbit * glm::vec4{cameraOffset, 0.0f}};
+        }
+
+        const glm::vec3 eye = center + cameraOffset;
 
         glm::mat4 view = glm::lookAt(eye, center + glm::vec3{0.0f, 2.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f});
         glm::mat4 projection = glm::perspective(glm::radians(50.0f),
