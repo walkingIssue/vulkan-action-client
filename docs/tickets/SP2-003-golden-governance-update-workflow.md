@@ -1,6 +1,6 @@
 # SP2-003: Golden Governance and Update Workflow v1
 
-Status: in progress
+Status: ready for merge
 Branch: sprint02/sp2-003-golden-governance-update-workflow
 Start commit: `f512327`
 Source plan: `docs/sprint-02-implementation-plan.md`
@@ -91,11 +91,20 @@ Ownership boundaries:
 
 - 2026-06-20: Planned by `SP2-PLAN`. Implementation not yet dispatched.
 - 2026-06-20: Lara dispatched by Mia for SP2-003 from `origin/main` `f512327`; posted ACK/start evidence with tracked-clean status and untracked `assets/` only.
+- 2026-06-20: Added `docs/golden-trace-workflow.md` and focused golden governance tests covering normal no-rewrite behavior, missing update option, missing environment gate, fully guarded temporary updates, and expanded damage/reaction mismatch diagnostics.
 
 ## Verification Results
 
-Fill this before merging.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target combat_scenario_tests` passed.
+- `. .\tools\dev-shell.ps1; .\build\msvc-debug\combat_scenario_tests.exe` passed.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R combat_scenario_tests --output-on-failure` passed: 1/1.
+- Initial `. .\tools\dev-shell.ps1; Remove-Item Env:VAC_UPDATE_GOLDENS -ErrorAction SilentlyContinue; ctest --preset msvc-debug-combat --output-on-failure` failed because several process/viewer/move executables were stale after the focused-only build.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` refreshed stale binaries and passed.
+- `. .\tools\dev-shell.ps1; Remove-Item Env:VAC_UPDATE_GOLDENS -ErrorAction SilentlyContinue; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13.
+- `. .\tools\dev-shell.ps1; Remove-Item Env:VAC_UPDATE_GOLDENS -ErrorAction SilentlyContinue; ctest --preset msvc-debug --output-on-failure` passed: 27/27.
+- MSVC runtime/assertion dialog check found no matching visible dialogs.
 
 ## Final Commits
 
-Fill this after implementation.
+- `e833bc3` Start SP2-003 golden governance workflow
+- `0afeb4a` Harden scenario golden governance
