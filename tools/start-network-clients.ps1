@@ -9,6 +9,8 @@ param(
 
     [int]$Frames = 0,
 
+    [switch]$RandomIds,
+
     [switch]$NoServer
 )
 
@@ -62,8 +64,28 @@ if (-not $NoServer) {
     }
 }
 
+function New-ClientIds {
+    param(
+        [Parameter(Mandatory = $true)][int]$Count,
+        [Parameter(Mandatory = $true)][bool]$Random
+    )
+
+    if (-not $Random) {
+        return @(1..$Count)
+    }
+
+    $ids = [System.Collections.Generic.HashSet[int]]::new()
+    while ($ids.Count -lt $Count) {
+        [void]$ids.Add((Get-Random -Minimum 1 -Maximum 256))
+    }
+    return @($ids | Sort-Object)
+}
+
+$clientIds = New-ClientIds -Count $Clients -Random ([bool]$RandomIds)
+Write-Host "Client ids: $($clientIds -join ', ')"
+
 $started = @()
-for ($clientId = 1; $clientId -le $Clients; ++$clientId) {
+foreach ($clientId in $clientIds) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $clientOut = Join-Path $logDir "client$clientId-$stamp.out.log"
     $clientErr = Join-Path $logDir "client$clientId-$stamp.err.log"
@@ -85,9 +107,9 @@ for ($clientId = 1; $clientId -le $Clients; ++$clientId) {
 }
 
 Start-Sleep -Milliseconds 500
-foreach ($index in 0..($started.Count - 1)) {
+for ($index = 0; $index -lt $started.Count; ++$index) {
     $client = $started[$index]
-    $clientId = $index + 1
+    $clientId = $clientIds[$index]
     $client.Refresh()
     if ($client.HasExited) {
         Write-Host "Client $clientId exited immediately with code $($client.ExitCode). Logs: $logDir"

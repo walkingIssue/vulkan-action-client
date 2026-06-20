@@ -88,7 +88,7 @@ Run the relay server and two optimistic clients:
 .\tools\start-network-clients.ps1
 ```
 
-Pass `-Clients 5` to launch five viewer processes. Each viewer owns one local actor and dynamically creates remote actors as peers connect.
+Pass `-Clients 5` to launch five viewer processes. Each viewer owns one local actor and dynamically creates remote actors as peers connect. Add `-RandomIds` to assign unique random client ids for independent connection testing.
 
 Or run the pieces manually:
 
