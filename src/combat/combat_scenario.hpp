@@ -45,12 +45,15 @@ struct ScenarioCombatBridge
 struct ScenarioActor
 {
     simulation::RuntimeActorId id;
+    std::string characterId;
     std::string spawnId;
     std::string team;
     std::optional<glm::vec3> translation;
     std::optional<float> yawDegrees;
     ScenarioHurtbox hurtbox;
     ScenarioCombatBridge combatBridge;
+    bool hasHurtboxOverride = false;
+    bool hasCombatBridgeOverride = false;
 };
 
 struct ScenarioInputCommand
@@ -74,6 +77,7 @@ struct CombatScenario
     uint32_t durationTicks = 0;
     uint64_t seed = 0;
     std::filesystem::path mapPath;
+    std::vector<std::filesystem::path> characterPaths;
     std::vector<std::filesystem::path> movePaths;
     std::vector<ScenarioAnimationBinding> animations;
     std::vector<ScenarioActor> actors;
@@ -90,6 +94,7 @@ struct ScenarioResolvedAnimationPath
 struct CombatScenarioResolvedPaths
 {
     std::filesystem::path mapPath;
+    std::vector<std::filesystem::path> characterPaths;
     std::vector<std::filesystem::path> movePaths;
     std::vector<ScenarioResolvedAnimationPath> animations;
     std::filesystem::path goldenPath;

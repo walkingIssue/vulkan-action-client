@@ -4,6 +4,9 @@
   "durationTicks": 18,
   "seed": 1003,
   "map": "content/maps/basic_primitive_arena.map.json",
+  "characters": [
+    "content/characters/basic_duelists.character.json"
+  ],
   "moves": [
     "content/moves/light_attack.move.json",
     "content/moves/light_followup.move.json",
@@ -17,21 +20,17 @@
   "actors": [
     {
       "id": 1,
+      "character": "character.duelist.player",
       "spawn": "player_spawn",
-      "team": "player",
       "translation": [0.0, 0.0, 0.0],
-      "yawDegrees": 0.0,
-      "combatBridge": {"maxHealth": 100, "health": 100},
-      "hurtbox": {"shape": "box", "size": [1.2, 2.6, 1.2], "offset": [0.0, 1.3, 0.0]}
+      "yawDegrees": 0.0
     },
     {
       "id": 2,
+      "character": "character.duelist.enemy",
       "spawn": "enemy_spawn",
-      "team": "enemy",
       "translation": [2.1, 0.0, 3.1],
-      "yawDegrees": 180.0,
-      "combatBridge": {"maxHealth": 100, "health": 100},
-      "hurtbox": {"shape": "box", "size": [1.5, 2.8, 1.5], "offset": [0.0, 1.4, 0.0]}
+      "yawDegrees": 180.0
     }
   ],
   "inputs": [

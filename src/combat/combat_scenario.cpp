@@ -4,7 +4,9 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <initializer_list>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
@@ -27,6 +29,22 @@ using json = nlohmann::json;
 constexpr uint64_t kFnvOffset = 14695981039346656037ull;
 constexpr uint64_t kFnvPrime = 1099511628211ull;
 constexpr uint32_t kScenarioInvulnerableTag = 1;
+
+struct ScenarioCharacterDefinition
+{
+    std::filesystem::path sourcePath;
+    std::string logicalId;
+    std::string label;
+    ScenarioCombatBridge combatBridge;
+    ScenarioHurtbox hurtbox;
+    std::vector<std::string> defaultMoves;
+};
+
+struct ScenarioCharacterLoadResult
+{
+    std::vector<ScenarioCharacterDefinition> characters;
+    std::vector<ScenarioDiagnostic> diagnostics;
+};
 
 std::filesystem::path projectRoot()
 {
@@ -58,15 +76,53 @@ ScenarioCombatBridge readCombatBridge(const json &value)
     return bridge;
 }
 
-CombatVolumeKind volumeKindFromString(const std::string &value)
+std::optional<uint32_t> readUnsignedField(const json &value, std::initializer_list<std::string_view> names)
 {
+    if (!value.is_object()) {
+        return std::nullopt;
+    }
+
+    for (std::string_view name : names) {
+        const auto it = value.find(std::string{name});
+        if (it == value.end()) {
+            continue;
+        }
+        if (it->is_number_unsigned()) {
+            const uint64_t raw = it->get<uint64_t>();
+            if (raw <= std::numeric_limits<uint32_t>::max()) {
+                return static_cast<uint32_t>(raw);
+            }
+            return std::nullopt;
+        }
+        if (it->is_number_integer()) {
+            const int64_t raw = it->get<int64_t>();
+            if (raw >= 0 && raw <= static_cast<int64_t>(std::numeric_limits<uint32_t>::max())) {
+                return static_cast<uint32_t>(raw);
+            }
+        }
+        return std::nullopt;
+    }
+
+    return std::nullopt;
+}
+
+std::optional<CombatVolumeKind> tryVolumeKindFromString(const std::string &value)
+{
+    if (value == "box") {
+        return CombatVolumeKind::box;
+    }
     if (value == "sphere") {
         return CombatVolumeKind::sphere;
     }
     if (value == "capsule") {
         return CombatVolumeKind::capsule;
     }
-    return CombatVolumeKind::box;
+    return std::nullopt;
+}
+
+CombatVolumeKind volumeKindFromString(const std::string &value)
+{
+    return tryVolumeKindFromString(value).value_or(CombatVolumeKind::box);
 }
 
 std::string toString(CombatVolumeKind kind)
@@ -80,6 +136,52 @@ std::string toString(CombatVolumeKind kind)
         return "box";
     }
     return "box";
+}
+
+ScenarioHurtbox readHurtbox(const json &value, ScenarioHurtbox fallback)
+{
+    if (!value.is_object()) {
+        return fallback;
+    }
+
+    fallback.kind = volumeKindFromString(value.value("shape", "box"));
+    fallback.size = readVec3(value.value("size", json::array()), fallback.size);
+    fallback.offset = readVec3(value.value("offset", json::array()), fallback.offset);
+    return fallback;
+}
+
+bool isFiniteVec3(glm::vec3 value)
+{
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
+
+std::optional<glm::vec3> readRequiredVec3(const json &value, bool requirePositive)
+{
+    if (!value.is_array() || value.size() != 3) {
+        return std::nullopt;
+    }
+
+    glm::vec3 result{};
+    for (size_t i = 0; i < 3; ++i) {
+        if (!value.at(i).is_number()) {
+            return std::nullopt;
+        }
+        result[static_cast<glm::length_t>(i)] = value.at(i).get<float>();
+    }
+
+    if (!isFiniteVec3(result)) {
+        return std::nullopt;
+    }
+    if (requirePositive && (result.x <= 0.0f || result.y <= 0.0f || result.z <= 0.0f)) {
+        return std::nullopt;
+    }
+    return result;
+}
+
+bool isValidHurtbox(const ScenarioHurtbox &hurtbox)
+{
+    return isFiniteVec3(hurtbox.size) && isFiniteVec3(hurtbox.offset) && hurtbox.size.x > 0.0f &&
+           hurtbox.size.y > 0.0f && hurtbox.size.z > 0.0f;
 }
 
 glm::vec3 rotateYaw(glm::vec3 value, float yawDegrees)
@@ -130,6 +232,225 @@ void addMissingFileDiagnostic(std::vector<ScenarioDiagnostic> &diagnostics, std:
                   std::move(label) + " does not exist: " + pathMessage(path));
 }
 
+std::string characterDefinitionField(size_t fileIndex, size_t characterIndex, std::string_view suffix)
+{
+    std::string field = "characters/" + std::to_string(fileIndex) + "/characters/" + std::to_string(characterIndex);
+    if (!suffix.empty()) {
+        field += "/";
+        field += suffix;
+    }
+    return field;
+}
+
+bool readCharacterHealth(const json &item, ScenarioCombatBridge &bridge)
+{
+    if (!item.is_object()) {
+        return false;
+    }
+    const auto it = item.find("defaultHealth");
+    if (it == item.end()) {
+        return false;
+    }
+
+    const std::optional<uint32_t> maxHealth = readUnsignedField(*it, {"max", "maxHealth"});
+    const std::optional<uint32_t> currentHealth = readUnsignedField(*it, {"current", "health"});
+    if (!maxHealth.has_value() || !currentHealth.has_value() || *maxHealth == 0 ||
+        *currentHealth > *maxHealth) {
+        return false;
+    }
+
+    bridge.maxHealth = *maxHealth;
+    bridge.health = *currentHealth;
+    return true;
+}
+
+bool readCharacterHurtbox(const json &item, ScenarioHurtbox &hurtbox)
+{
+    if (!item.is_object()) {
+        return false;
+    }
+    const auto it = item.find("defaultHurtbox");
+    if (it == item.end() || !it->is_object()) {
+        return false;
+    }
+
+    const std::string shape = it->value("shape", "box");
+    const std::optional<CombatVolumeKind> kind = tryVolumeKindFromString(shape);
+    const auto sizeIt = it->find("size");
+    const auto offsetIt = it->find("offset");
+    if (!kind.has_value() || sizeIt == it->end() || offsetIt == it->end()) {
+        return false;
+    }
+
+    const std::optional<glm::vec3> size = readRequiredVec3(*sizeIt, true);
+    const std::optional<glm::vec3> offset = readRequiredVec3(*offsetIt, false);
+    if (!size.has_value() || !offset.has_value()) {
+        return false;
+    }
+
+    hurtbox.kind = *kind;
+    hurtbox.size = *size;
+    hurtbox.offset = *offset;
+    return true;
+}
+
+ScenarioCharacterLoadResult loadCharacterDefinitions(const CombatScenario &scenario,
+                                                     const std::vector<std::filesystem::path> &resolvedPaths,
+                                                     const std::unordered_set<std::string> &knownMoveIds)
+{
+    ScenarioCharacterLoadResult result;
+    std::unordered_map<std::string, std::string> seenCharacterFields;
+
+    for (size_t fileIndex = 0; fileIndex < scenario.characterPaths.size(); ++fileIndex) {
+        const std::filesystem::path &resolvedPath = resolvedPaths[fileIndex];
+        std::ifstream input{resolvedPath};
+        if (!input) {
+            addMissingFileDiagnostic(result.diagnostics, "missing_character_file",
+                                     "characters/" + std::to_string(fileIndex), "Character definition file",
+                                     resolvedPath);
+            continue;
+        }
+
+        json document;
+        input >> document;
+        if (document.value("schemaVersion", 0u) != kCombatScenarioSchemaVersion) {
+            addDiagnostic(result.diagnostics, "unsupported_character_schema_version",
+                          "characters/" + std::to_string(fileIndex) + "/schemaVersion",
+                          "Character definition schema version is not supported");
+        }
+
+        const auto charactersIt = document.find("characters");
+        if (charactersIt == document.end() || !charactersIt->is_array() || charactersIt->empty()) {
+            addDiagnostic(result.diagnostics, "missing_character_definitions",
+                          "characters/" + std::to_string(fileIndex) + "/characters",
+                          "Character definition file must contain at least one character");
+            continue;
+        }
+
+        for (size_t characterIndex = 0; characterIndex < charactersIt->size(); ++characterIndex) {
+            const json &item = charactersIt->at(characterIndex);
+            const std::string baseField = characterDefinitionField(fileIndex, characterIndex, "");
+            if (!item.is_object()) {
+                addDiagnostic(result.diagnostics, "invalid_character_definition", baseField,
+                              "Character definition entries must be objects");
+                continue;
+            }
+
+            ScenarioCharacterDefinition definition;
+            definition.sourcePath = scenario.characterPaths[fileIndex];
+            definition.logicalId = item.value("id", "");
+            definition.label = item.value("label", definition.logicalId);
+
+            bool duplicate = false;
+            if (definition.logicalId.empty()) {
+                addDiagnostic(result.diagnostics, "missing_character_id",
+                              characterDefinitionField(fileIndex, characterIndex, "id"),
+                              "Character definition id is required");
+            } else if (!seenCharacterFields.emplace(definition.logicalId, baseField).second) {
+                duplicate = true;
+                addDiagnostic(result.diagnostics, "duplicate_character_id",
+                              characterDefinitionField(fileIndex, characterIndex, "id"),
+                              "Character definition id is duplicated: " + definition.logicalId);
+            }
+
+            if (!readCharacterHealth(item, definition.combatBridge)) {
+                addDiagnostic(result.diagnostics, "invalid_character_health",
+                              characterDefinitionField(fileIndex, characterIndex, "defaultHealth"),
+                              "Character default health must have positive max and current not exceeding max");
+            }
+
+            if (!readCharacterHurtbox(item, definition.hurtbox)) {
+                addDiagnostic(result.diagnostics, "invalid_character_hurtbox",
+                              characterDefinitionField(fileIndex, characterIndex, "defaultHurtbox"),
+                              "Character default hurtbox must have a valid shape, positive size, and finite offset");
+            }
+
+            const auto movesIt = item.find("defaultMoves");
+            if (movesIt == item.end() || !movesIt->is_array() || movesIt->empty()) {
+                addDiagnostic(result.diagnostics, "missing_character_moves",
+                              characterDefinitionField(fileIndex, characterIndex, "defaultMoves"),
+                              "Character definition must list at least one default move id");
+            } else {
+                definition.defaultMoves.reserve(movesIt->size());
+                for (size_t moveIndex = 0; moveIndex < movesIt->size(); ++moveIndex) {
+                    const std::string moveField =
+                        characterDefinitionField(fileIndex, characterIndex,
+                                                 "defaultMoves/" + std::to_string(moveIndex));
+                    if (!movesIt->at(moveIndex).is_string() || movesIt->at(moveIndex).get<std::string>().empty()) {
+                        addDiagnostic(result.diagnostics, "invalid_character_move", moveField,
+                                      "Character default move ids must be non-empty strings");
+                        continue;
+                    }
+
+                    const std::string moveId = movesIt->at(moveIndex).get<std::string>();
+                    if (!knownMoveIds.contains(moveId)) {
+                        addDiagnostic(result.diagnostics, "unknown_character_move", moveField,
+                                      "Character default move references an unknown scenario move: " + moveId);
+                        continue;
+                    }
+                    definition.defaultMoves.push_back(moveId);
+                }
+            }
+
+            if (!definition.logicalId.empty() && !duplicate) {
+                result.characters.push_back(std::move(definition));
+            }
+        }
+    }
+
+    return result;
+}
+
+std::vector<ScenarioDiagnostic> validateCharacterReferences(
+    const CombatScenario &scenario, const std::vector<ScenarioCharacterDefinition> &characters)
+{
+    std::vector<ScenarioDiagnostic> diagnostics;
+    std::unordered_set<std::string> characterIds;
+    for (const ScenarioCharacterDefinition &character : characters) {
+        characterIds.insert(character.logicalId);
+    }
+
+    for (size_t i = 0; i < scenario.actors.size(); ++i) {
+        const ScenarioActor &actor = scenario.actors[i];
+        if (actor.characterId.empty()) {
+            continue;
+        }
+        if (!characterIds.contains(actor.characterId)) {
+            addDiagnostic(diagnostics, "unknown_actor_character", "actors/" + std::to_string(i) + "/character",
+                          "Scenario actor references an unknown character: " + actor.characterId);
+        }
+    }
+
+    return diagnostics;
+}
+
+void applyCharacterDefaults(CombatScenario &scenario, const std::vector<ScenarioCharacterDefinition> &characters)
+{
+    std::unordered_map<std::string, const ScenarioCharacterDefinition *> definitions;
+    for (const ScenarioCharacterDefinition &character : characters) {
+        definitions.emplace(character.logicalId, &character);
+    }
+
+    for (ScenarioActor &actor : scenario.actors) {
+        if (actor.characterId.empty()) {
+            continue;
+        }
+
+        const auto it = definitions.find(actor.characterId);
+        if (it == definitions.end()) {
+            continue;
+        }
+
+        const ScenarioCharacterDefinition &definition = *it->second;
+        if (!actor.hasCombatBridgeOverride) {
+            actor.combatBridge = definition.combatBridge;
+        }
+        if (!actor.hasHurtboxOverride) {
+            actor.hurtbox = definition.hurtbox;
+        }
+    }
+}
+
 std::vector<ScenarioDiagnostic> validateScenario(const CombatScenario &scenario)
 {
     std::vector<ScenarioDiagnostic> diagnostics;
@@ -167,12 +488,17 @@ std::vector<ScenarioDiagnostic> validateScenario(const CombatScenario &scenario)
             addDiagnostic(diagnostics, "missing_actor_placement", field,
                           "Actor must name a spawn or provide an explicit translation");
         }
-        if (actor.team.empty()) {
-            addDiagnostic(diagnostics, "missing_actor_team", field + "/team", "Actor team is required");
+        if (actor.team.empty() && actor.spawnId.empty()) {
+            addDiagnostic(diagnostics, "missing_actor_team", field + "/team",
+                          "Actor team is required when no spawn supplies ownership");
         }
         if (actor.combatBridge.maxHealth == 0 || actor.combatBridge.health > actor.combatBridge.maxHealth) {
             addDiagnostic(diagnostics, "invalid_combat_bridge", field + "/combatBridge",
                           "Scenario combat bridge health must be positive and not exceed maxHealth");
+        }
+        if (!isValidHurtbox(actor.hurtbox)) {
+            addDiagnostic(diagnostics, "invalid_actor_hurtbox", field + "/hurtbox",
+                          "Scenario actor hurtbox size must be positive and finite");
         }
     }
 
@@ -780,6 +1106,9 @@ CombatScenario combatScenarioFromJson(const nlohmann::json &document, std::files
     scenario.mapPath = document.value("map", "");
     scenario.goldenPath = document.value("golden", "");
 
+    for (const json &item : document.value("characters", json::array())) {
+        scenario.characterPaths.emplace_back(item.get<std::string>());
+    }
     for (const json &item : document.value("moves", json::array())) {
         scenario.movePaths.emplace_back(item.get<std::string>());
     }
@@ -792,6 +1121,7 @@ CombatScenario combatScenarioFromJson(const nlohmann::json &document, std::files
     for (const json &item : document.value("actors", json::array())) {
         ScenarioActor actor;
         actor.id = {item.value("id", 0u)};
+        actor.characterId = item.value("character", "");
         actor.spawnId = item.value("spawn", "");
         actor.team = item.value("team", "");
         if (item.contains("translation")) {
@@ -801,12 +1131,13 @@ CombatScenario combatScenarioFromJson(const nlohmann::json &document, std::files
             actor.yawDegrees = item.at("yawDegrees").get<float>();
         }
         if (item.contains("hurtbox") && item.at("hurtbox").is_object()) {
-            const json &hurtbox = item.at("hurtbox");
-            actor.hurtbox.kind = volumeKindFromString(hurtbox.value("shape", "box"));
-            actor.hurtbox.size = readVec3(hurtbox.value("size", json::array()), actor.hurtbox.size);
-            actor.hurtbox.offset = readVec3(hurtbox.value("offset", json::array()), actor.hurtbox.offset);
+            actor.hasHurtboxOverride = true;
+            actor.hurtbox = readHurtbox(item.at("hurtbox"), actor.hurtbox);
         }
-        actor.combatBridge = readCombatBridge(item.value("combatBridge", json::object()));
+        if (item.contains("combatBridge")) {
+            actor.hasCombatBridgeOverride = true;
+            actor.combatBridge = readCombatBridge(item.value("combatBridge", json::object()));
+        }
         scenario.actors.push_back(std::move(actor));
     }
     for (const json &item : document.value("inputs", json::array())) {
@@ -842,6 +1173,10 @@ CombatScenarioResolvedPaths resolveCombatScenarioPaths(const CombatScenario &sce
     CombatScenarioResolvedPaths paths;
     paths.mapPath = resolveScenarioPath(scenario, scenario.mapPath);
     paths.goldenPath = resolveScenarioPath(scenario, scenario.goldenPath);
+    paths.characterPaths.reserve(scenario.characterPaths.size());
+    for (const std::filesystem::path &characterPath : scenario.characterPaths) {
+        paths.characterPaths.push_back(resolveScenarioPath(scenario, characterPath));
+    }
     paths.movePaths.reserve(scenario.movePaths.size());
     for (const std::filesystem::path &movePath : scenario.movePaths) {
         paths.movePaths.push_back(resolveScenarioPath(scenario, movePath));
@@ -940,6 +1275,8 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
         }
 
         const std::filesystem::path resolvedMapPath = resolvePath(result.scenario, result.scenario.mapPath);
+        std::vector<std::filesystem::path> resolvedCharacterPaths;
+        resolvedCharacterPaths.reserve(result.scenario.characterPaths.size());
         std::vector<std::filesystem::path> resolvedMovePaths;
         resolvedMovePaths.reserve(result.scenario.movePaths.size());
         std::vector<std::filesystem::path> resolvedAnimationPaths;
@@ -947,6 +1284,15 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
 
         if (!fileExists(resolvedMapPath)) {
             addMissingFileDiagnostic(result.diagnostics, "missing_map_file", "map", "Scenario map", resolvedMapPath);
+        }
+        for (size_t i = 0; i < result.scenario.characterPaths.size(); ++i) {
+            const std::filesystem::path resolvedPath = resolvePath(result.scenario, result.scenario.characterPaths[i]);
+            resolvedCharacterPaths.push_back(resolvedPath);
+            if (!fileExists(resolvedPath)) {
+                addMissingFileDiagnostic(result.diagnostics, "missing_character_file",
+                                         "characters/" + std::to_string(i), "Character definition file",
+                                         resolvedPath);
+            }
         }
         for (size_t i = 0; i < result.scenario.movePaths.size(); ++i) {
             const std::filesystem::path resolvedPath = resolvePath(result.scenario, result.scenario.movePaths[i]);
@@ -1001,6 +1347,26 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
             }
             compiledMoves.push_back(compiledMove.move);
         }
+
+        std::unordered_set<std::string> knownMoveIds;
+        for (const content::CompiledMove &move : compiledMoves) {
+            knownMoveIds.insert(move.logicalId);
+        }
+
+        ScenarioCharacterLoadResult characterLoad =
+            loadCharacterDefinitions(result.scenario, resolvedCharacterPaths, knownMoveIds);
+        result.diagnostics = std::move(characterLoad.diagnostics);
+        std::vector<ScenarioDiagnostic> characterReferenceDiagnostics =
+            validateCharacterReferences(result.scenario, characterLoad.characters);
+        result.diagnostics.insert(result.diagnostics.end(), characterReferenceDiagnostics.begin(),
+                                  characterReferenceDiagnostics.end());
+        if (!result.diagnostics.empty()) {
+            result.status = "error";
+            result.message = "Character definition validation failed";
+            return result;
+        }
+
+        applyCharacterDefaults(result.scenario, characterLoad.characters);
 
         std::unordered_map<std::string, animation::ProxyAnimationAsset> animations;
         for (size_t i = 0; i < result.scenario.animations.size(); ++i) {

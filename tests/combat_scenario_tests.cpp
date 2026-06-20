@@ -93,6 +93,35 @@ std::filesystem::path writeMoveWithHitboxSocket(std::string_view socketName)
     return outputPath;
 }
 
+nlohmann::json readJsonFile(const std::filesystem::path &path)
+{
+    std::ifstream input{path};
+    if (!input) {
+        throw std::runtime_error("Could not open JSON fixture " + path.string());
+    }
+
+    nlohmann::json document;
+    input >> document;
+    return document;
+}
+
+std::filesystem::path writeCharacterDefinitionFixture(const nlohmann::json &document, std::string_view suffix)
+{
+    const std::filesystem::path outputPath =
+        std::filesystem::temp_directory_path() / ("vac_sp2_002_" + std::string{suffix} + ".character.json");
+    std::ofstream output{outputPath, std::ios::trunc};
+    if (!output) {
+        throw std::runtime_error("Could not write temporary character definition " + outputPath.string());
+    }
+    output << document.dump(2) << '\n';
+    return outputPath;
+}
+
+nlohmann::json baseCharacterDefinitions()
+{
+    return readJsonFile(projectRoot() / "content/characters/basic_duelists.character.json");
+}
+
 void goldenScenariosMatch()
 {
     const std::vector<std::string_view> scenarios = {
@@ -151,6 +180,7 @@ void missingContentPathsReportStructuredDiagnostics()
     vac::combat::CombatScenario scenario =
         vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
     scenario.mapPath = "content/maps/rm1_missing.map.json";
+    scenario.characterPaths[0] = "content/characters/sp2_missing.character.json";
     scenario.movePaths[0] = "content/moves/rm1_missing.move.json";
     scenario.animations[0].path = "content/animations/rm1_missing.proxy_anim.json";
     scenario.goldenPath = "tests/fixtures/scenarios/goldens/rm1_missing.golden.json";
@@ -159,10 +189,109 @@ void missingContentPathsReportStructuredDiagnostics()
     expect(result.status == "error", "missing content graph exits error");
     expect(result.message == "Scenario content graph validation failed", "missing content graph message");
     expectDiagnostic(result, "missing_map_file", "map");
+    expectDiagnostic(result, "missing_character_file", "characters/0");
     expectDiagnostic(result, "missing_move_file", "moves/0");
     expectDiagnostic(result, "missing_proxy_animation_file", "animations/0/path");
     expectDiagnostic(result, "missing_golden_file", "golden");
     expect(result.trace.events.empty(), "missing content graph exits before simulation");
+}
+
+void characterDefinitionsDriveActorDefaults()
+{
+    const vac::combat::CombatScenario loaded =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    expect(loaded.characterPaths.size() == 1, "scenario references character definition file");
+    expect(loaded.actors.size() == 2, "scenario has two actors");
+    if (loaded.actors.size() < 2) {
+        return;
+    }
+
+    expect(loaded.actors[0].characterId == "character.duelist.player", "player actor references character");
+    expect(loaded.actors[1].characterId == "character.duelist.enemy", "enemy actor references character");
+    expect(!loaded.actors[0].hasCombatBridgeOverride, "player health default comes from character");
+    expect(!loaded.actors[1].hasHurtboxOverride, "enemy hurtbox default comes from character");
+    expect(loaded.actors[0].team.empty(), "player team ownership comes from spawn");
+    expect(loaded.actors[1].team.empty(), "enemy team ownership comes from spawn");
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(loaded);
+    expect(result.status == "ok", "character-backed scenario exits ok");
+    expect(result.goldenCompared && result.goldenMatched, "character-backed scenario matches golden");
+    expect(result.scenario.actors[0].combatBridge.maxHealth == 100, "character default health applied");
+    expect(result.scenario.actors[1].hurtbox.size.x > 1.49f && result.scenario.actors[1].hurtbox.size.x < 1.51f,
+           "character default hurtbox applied");
+}
+
+void duplicateCharacterIdsFailBeforeSimulation()
+{
+    nlohmann::json document = baseCharacterDefinitions();
+    document["characters"].push_back(document["characters"].at(0));
+
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.characterPaths = {writeCharacterDefinitionFixture(document, "duplicate_ids")};
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "duplicate character id exits error");
+    expect(result.message == "Character definition validation failed", "duplicate character id message");
+    expectDiagnostic(result, "duplicate_character_id", "characters/0/characters/2/id");
+    expect(result.trace.events.empty(), "duplicate character id exits before simulation");
+}
+
+void unknownCharacterMoveFailsBeforeSimulation()
+{
+    nlohmann::json document = baseCharacterDefinitions();
+    document["characters"].at(0)["defaultMoves"].at(0) = "move.sp2_missing";
+
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.characterPaths = {writeCharacterDefinitionFixture(document, "unknown_move")};
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "unknown character move exits error");
+    expectDiagnostic(result, "unknown_character_move", "characters/0/characters/0/defaultMoves/0");
+    expect(result.trace.events.empty(), "unknown character move exits before simulation");
+}
+
+void invalidCharacterHealthFailsBeforeSimulation()
+{
+    nlohmann::json document = baseCharacterDefinitions();
+    document["characters"].at(0)["defaultHealth"]["max"] = 0;
+
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.characterPaths = {writeCharacterDefinitionFixture(document, "bad_health")};
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "invalid character health exits error");
+    expectDiagnostic(result, "invalid_character_health", "characters/0/characters/0/defaultHealth");
+    expect(result.trace.events.empty(), "invalid character health exits before simulation");
+}
+
+void invalidCharacterHurtboxFailsBeforeSimulation()
+{
+    nlohmann::json document = baseCharacterDefinitions();
+    document["characters"].at(0)["defaultHurtbox"]["size"] = nlohmann::json::array({0.0, 2.6, 1.2});
+
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.characterPaths = {writeCharacterDefinitionFixture(document, "bad_hurtbox")};
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "invalid character hurtbox exits error");
+    expectDiagnostic(result, "invalid_character_hurtbox", "characters/0/characters/0/defaultHurtbox");
+    expect(result.trace.events.empty(), "invalid character hurtbox exits before simulation");
+}
+
+void unknownActorCharacterFailsBeforeSimulation()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.actors[0].characterId = "character.sp2_missing";
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "unknown actor character exits error");
+    expectDiagnostic(result, "unknown_actor_character", "actors/0/character");
+    expect(result.trace.events.empty(), "unknown actor character exits before simulation");
 }
 
 void unknownAnimationBindingReportsMoveDiagnostic()
@@ -252,6 +381,12 @@ int main()
         guardedGoldenUpdateRequiresExplicitPermission();
         goldenMismatchReportsExpectedAndActual();
         missingContentPathsReportStructuredDiagnostics();
+        characterDefinitionsDriveActorDefaults();
+        duplicateCharacterIdsFailBeforeSimulation();
+        unknownCharacterMoveFailsBeforeSimulation();
+        invalidCharacterHealthFailsBeforeSimulation();
+        invalidCharacterHurtboxFailsBeforeSimulation();
+        unknownActorCharacterFailsBeforeSimulation();
         unknownAnimationBindingReportsMoveDiagnostic();
         hitboxMoveRequiresProxyAnimationBinding();
         hitboxSocketMustExistInBoundProxyAnimation();

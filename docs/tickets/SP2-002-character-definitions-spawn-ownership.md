@@ -1,8 +1,8 @@
 # SP2-002: Character Definition and Spawn Ownership v1
 
-Status: planned
+Status: ready for merge
 Branch: sprint02/sp2-002-character-definitions-spawn-ownership
-Start commit: TBD by dispatched owner
+Start commit: `dc260f0`
 Source plan: `docs/sprint-02-implementation-plan.md`
 Source result docs:
 - `docs/tickets/SP1-004-authoring-scene-v0_result.md`
@@ -89,11 +89,19 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Planned by `SP2-PLAN`. Implementation not yet dispatched.
+- 2026-06-20: Implemented by Vera from `origin/main` `dc260f0` after Mia fallback dispatch. Added tracked character definitions, migrated scenario actors to character refs/spawn-owned teams, and added character validation coverage.
 
 ## Verification Results
 
-Fill this before merging.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug --target combat_scenario_tests` passed.
+- `. .\tools\dev-shell.ps1; .\build\msvc-debug\combat_scenario_tests.exe` passed.
+- `. .\tools\dev-shell.ps1; ctest --test-dir build/msvc-debug -R combat_scenario_tests --output-on-failure` passed: 1/1.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-content --output-on-failure` passed: 4/4.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug` passed with existing `std::getenv` deprecation and Xinput import warnings.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13 after rebuilding stale runner/viewer executables.
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug --output-on-failure` passed: 27/27.
+- MSVC runtime/assertion dialog check found no matching visible dialogs.
 
 ## Final Commits
 
-Fill this after implementation.
+Pending final branch commit.
