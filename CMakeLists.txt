@@ -74,6 +74,21 @@ target_link_libraries(simulation_core PUBLIC
     scene_core
 )
 
+add_library(combat_runtime_core
+    src/combat/combat_runtime.cpp
+)
+
+target_compile_features(combat_runtime_core PUBLIC cxx_std_20)
+
+target_include_directories(combat_runtime_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(combat_runtime_core PUBLIC
+    content_core
+    simulation_core
+)
+
 add_library(input_core
     src/input/glfw_control_bindings.cpp
 )
@@ -269,6 +284,22 @@ if(BUILD_TESTING)
     set_tests_properties(simulation_runtime_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;simulation;runtime"
+    )
+
+    add_executable(combat_runtime_tests
+        tests/combat_runtime_tests.cpp
+    )
+
+    target_compile_features(combat_runtime_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(combat_runtime_tests PRIVATE
+        combat_runtime_core
+    )
+
+    add_test(NAME combat_runtime_tests COMMAND combat_runtime_tests)
+    set_tests_properties(combat_runtime_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;combat;runtime"
     )
 
     add_executable(movement_behavior_tests

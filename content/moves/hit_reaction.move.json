@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "move-guid-hit-reaction",
+  "logicalId": "move.hit_reaction",
+  "durationTicks": 20,
+  "tags": ["startup", "active", "recovery", "stunned"],
+  "knownMoves": ["move.light_attack", "move.light_followup", "move.dodge", "move.hit_reaction"],
+  "input": {
+    "command": "hit_reaction",
+    "bufferTicks": 0
+  },
+  "phases": [
+    {"id": "startup", "beginTick": 0, "endTick": 1, "tags": ["startup", "stunned"]},
+    {"id": "active", "beginTick": 1, "endTick": 16, "tags": ["active", "stunned"]},
+    {"id": "recovery", "beginTick": 16, "endTick": 20, "tags": ["recovery"]}
+  ],
+  "movementTracks": [],
+  "hitboxTracks": [],
+  "hurtboxOverrides": [
+    {"id": "stunned_hurtbox", "beginTick": 0, "endTick": 20, "profile": "stunned", "tags": ["stunned"]}
+  ],
+  "cancels": [],
+  "resources": {
+    "staminaCost": 0.0
+  },
+  "events": [
+    {"id": "hit_reaction_start", "tick": 0, "type": "debug_event", "payload": "hit_reaction_start", "tags": ["stunned"]}
+  ]
+}
