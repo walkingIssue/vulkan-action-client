@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include <glm/geometric.hpp>
+#include <glm/trigonometric.hpp>
 
 namespace vac::combat
 {
@@ -29,12 +30,25 @@ void beginTick(ActorState &actor)
     actor.previousTransform = actor.currentTransform;
 }
 
+MoveIntent toWorldMoveIntent(LocalMoveIntent intent, ControlFrame frame)
+{
+    const glm::vec2 axes = normalizedDirection(intent.axes);
+    if (glm::dot(axes, axes) <= 0.0001f) {
+        return {};
+    }
+
+    const float yawRadians = glm::radians(frame.yawDegrees);
+    const glm::vec2 right{std::cos(yawRadians), -std::sin(yawRadians)};
+    const glm::vec2 forward{std::sin(yawRadians), std::cos(yawRadians)};
+    return {normalizedDirection(right * axes.x + forward * axes.y)};
+}
+
 bool applyMoveIntent(ActorState &actor,
                      MoveIntent intent,
                      float deltaSeconds,
                      ArenaLimits arena)
 {
-    const glm::vec2 direction = normalizedDirection(intent.direction);
+    const glm::vec2 direction = normalizedDirection(intent.worldDirection);
     if (glm::dot(direction, direction) <= 0.0001f) {
         return false;
     }

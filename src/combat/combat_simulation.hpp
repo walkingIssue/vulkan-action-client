@@ -12,9 +12,19 @@ inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
 inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;
 inline constexpr float kArenaEdgeInsetWorldUnits = 5.0f;
 
+struct LocalMoveIntent
+{
+    glm::vec2 axes{0.0f};
+};
+
+struct ControlFrame
+{
+    float yawDegrees = 0.0f;
+};
+
 struct MoveIntent
 {
-    glm::vec2 direction{0.0f};
+    glm::vec2 worldDirection{0.0f};
 };
 
 struct ArenaLimits
@@ -31,6 +41,7 @@ struct ActorState
 };
 
 void beginTick(ActorState &actor);
+MoveIntent toWorldMoveIntent(LocalMoveIntent intent, ControlFrame frame);
 bool applyMoveIntent(ActorState &actor,
                      MoveIntent intent,
                      float deltaSeconds,

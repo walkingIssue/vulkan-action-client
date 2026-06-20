@@ -52,6 +52,8 @@ The simulation can produce compact presentation commands each tick. The renderer
 
 Movement speed belongs to combat state, not rendering. Inputs should be dimensionless intent such as "move northeast at full stick tilt"; the combat layer turns that into velocity using authored constants.
 
+The intent should carry an explicit frame conversion. Raw controls are local axes; a camera, character facing, or lock-on target frame turns those axes into world-space movement. That keeps "what the player meant" separate from "which way world +Z happens to be."
+
 For now the prototype uses world units per second:
 
 ```cpp
@@ -75,4 +77,4 @@ Prefer value types, dense arrays, handles, spans, inline helpers, and explicit u
 
 ## Current Prototype
 
-The scene viewer is presentation-only. It loads the bootstrap scene, builds static draw geometry, and orbits the camera so we can inspect instantiated assets. It should not become gameplay authority; it is just the first rendering loop.
+The scene viewer is presentation-only. It loads the bootstrap scene, builds static draw geometry, and anchors the camera to the player so we can inspect controllable actors. It should not become gameplay authority; it is just the first rendering loop.

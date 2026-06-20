@@ -19,7 +19,7 @@ DirectInput exists and is COM-based, but it is legacy for most modern game use. 
 
 For the first controller path, use XInput. It is narrow, stable, and enough for Xbox-compatible pads while we are still building the combat input model.
 
-The current scene viewer has the first thin version of this: XInput left stick and `WASD` move the player preview, while arrow keys move the sparring partner. This is prototype plumbing, not the final combat input API.
+The current scene viewer has the first thin version of this: XInput left stick and `WASD` move the player preview relative to the mouse-controlled camera, while arrow keys move the sparring partner relative to its own facing. This is prototype plumbing, not the final combat input API.
 
 ## Desired Engine Shape
 
@@ -52,6 +52,8 @@ struct CombatInput {
 ```
 
 That gives us clean edge detection, buffering windows, cancel checks, replay, rollback, and debugging. Rendering can run faster or slower without changing whether a dodge or attack happened.
+
+Movement axes should start local, not global. `WASD` and stick input describe "strafe" and "forward" in a control frame. The platform/presentation side chooses the frame, such as camera-relative movement for a third-person character, or character-relative movement for tank-style control. Combat then receives a world-space move intent produced from that explicit frame.
 
 ## Practical First Step
 

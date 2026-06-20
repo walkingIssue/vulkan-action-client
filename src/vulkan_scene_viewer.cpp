@@ -170,6 +170,7 @@ public:
         m_lineData = vac::buildSceneLineData(m_scene);
         findControllableActors();
         initializeCombatActors();
+        initializeCameraAnchor();
     }
 
     ~VulkanSceneViewer()
@@ -228,6 +229,11 @@ private:
     float m_presentationAlpha = 1.0f;
     float m_fpsAccumulatorSeconds = 0.0f;
     uint32_t m_fpsFrames = 0;
+    float m_cameraYawDegrees = 180.0f;
+    float m_cameraPitchDegrees = 24.0f;
+    bool m_mouseLookInitialized = false;
+    double m_lastMouseX = 0.0;
+    double m_lastMouseY = 0.0;
     std::optional<size_t> m_playerIndex;
     std::optional<size_t> m_sparringIndex;
     bool m_lineGeometryDirty = false;
@@ -237,6 +243,12 @@ private:
     {
         auto *viewer = reinterpret_cast<VulkanSceneViewer *>(glfwGetWindowUserPointer(window));
         viewer->m_framebufferResized = true;
+    }
+
+    static void cursorPositionCallback(GLFWwindow *window, double x, double y)
+    {
+        auto *viewer = reinterpret_cast<VulkanSceneViewer *>(glfwGetWindowUserPointer(window));
+        viewer->handleMouseLook(x, y);
     }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -265,6 +277,11 @@ private:
 
         glfwSetWindowUserPointer(m_window, this);
         glfwSetFramebufferSizeCallback(m_window, framebufferResizeCallback);
+        glfwSetCursorPosCallback(m_window, cursorPositionCallback);
+        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        if (glfwRawMouseMotionSupported() == GLFW_TRUE) {
+            glfwSetInputMode(m_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        }
     }
 
     void initVulkan()
@@ -341,14 +358,53 @@ private:
         }
     }
 
+    void initializeCameraAnchor()
+    {
+        if (m_playerIndex.has_value()) {
+            m_cameraYawDegrees = m_actorStates[*m_playerIndex].currentTransform.rotationDegrees.y;
+        }
+    }
+
+    void handleMouseLook(double x, double y)
+    {
+        if (m_options.orbitCamera) {
+            return;
+        }
+
+        if (!m_mouseLookInitialized) {
+            m_lastMouseX = x;
+            m_lastMouseY = y;
+            m_mouseLookInitialized = true;
+            return;
+        }
+
+        const double dx = x - m_lastMouseX;
+        const double dy = y - m_lastMouseY;
+        m_lastMouseX = x;
+        m_lastMouseY = y;
+
+        constexpr float sensitivity = 0.12f;
+        m_cameraYawDegrees += static_cast<float>(dx) * sensitivity;
+        m_cameraPitchDegrees = std::clamp(m_cameraPitchDegrees - static_cast<float>(dy) * sensitivity,
+                                          8.0f,
+                                          58.0f);
+    }
+
     void updateSimulation(float deltaSeconds)
     {
         m_fixedAccumulatorSeconds += std::min(deltaSeconds, 0.25f);
 
-        const vac::combat::MoveIntent playerIntent{readPlayerMove()};
-        const vac::combat::MoveIntent sparringIntent{
-            readKeyboardMove(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN),
-        };
+        const vac::combat::MoveIntent playerIntent = vac::combat::toWorldMoveIntent(
+            readPlayerMoveAxes(),
+            {m_cameraYawDegrees});
+
+        float sparringYawDegrees = 0.0f;
+        if (m_sparringIndex.has_value()) {
+            sparringYawDegrees = m_actorStates[*m_sparringIndex].currentTransform.rotationDegrees.y;
+        }
+        const vac::combat::MoveIntent sparringIntent = vac::combat::toWorldMoveIntent(
+            readKeyboardAxes(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN),
+            {sparringYawDegrees});
         const vac::combat::ArenaLimits arena = arenaLimits();
 
         int ticks = 0;
@@ -423,9 +479,9 @@ private:
         return vac::combat::interpolate(m_actorStates[actorIndex], m_presentationAlpha);
     }
 
-    glm::vec2 readPlayerMove() const
+    vac::combat::LocalMoveIntent readPlayerMoveAxes() const
     {
-        glm::vec2 move = readKeyboardMove(GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_W, GLFW_KEY_S);
+        glm::vec2 axes = readKeyboardAxes(GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_W, GLFW_KEY_S).axes;
 
 #ifdef _WIN32
         XINPUT_STATE state{};
@@ -434,30 +490,30 @@ private:
                                                         state.Gamepad.sThumbLY,
                                                         XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
             if (glm::dot(stick, stick) > 0.0f) {
-                move += glm::vec2{stick.x, -stick.y};
+                axes += stick;
             }
         }
 #endif
 
-        return normalizedMove(move);
+        return {normalizedMove(axes)};
     }
 
-    glm::vec2 readKeyboardMove(int leftKey, int rightKey, int forwardKey, int backwardKey) const
+    vac::combat::LocalMoveIntent readKeyboardAxes(int leftKey, int rightKey, int forwardKey, int backwardKey) const
     {
-        glm::vec2 move{0.0f};
+        glm::vec2 axes{0.0f};
         if (glfwGetKey(m_window, leftKey) == GLFW_PRESS) {
-            move.x -= 1.0f;
+            axes.x -= 1.0f;
         }
         if (glfwGetKey(m_window, rightKey) == GLFW_PRESS) {
-            move.x += 1.0f;
+            axes.x += 1.0f;
         }
         if (glfwGetKey(m_window, forwardKey) == GLFW_PRESS) {
-            move.y -= 1.0f;
+            axes.y += 1.0f;
         }
         if (glfwGetKey(m_window, backwardKey) == GLFW_PRESS) {
-            move.y += 1.0f;
+            axes.y -= 1.0f;
         }
-        return normalizedMove(move);
+        return {normalizedMove(axes)};
     }
 
     static glm::vec2 normalizedMove(glm::vec2 move)
@@ -1299,11 +1355,15 @@ private:
             anchorTransform = presentationTransform(*m_playerIndex);
         }
 
-        const float yaw = glm::radians(anchorTransform.rotationDegrees.y);
+        const float yaw = glm::radians(m_cameraYawDegrees);
+        const float pitch = glm::radians(m_cameraPitchDegrees);
         const glm::vec3 forward{std::sin(yaw), 0.0f, std::cos(yaw)};
         const glm::vec3 right{std::cos(yaw), 0.0f, -std::sin(yaw)};
         const glm::vec3 anchor = anchorTransform.translation + glm::vec3{0.0f, 6.5f, 0.0f};
-        glm::vec3 cameraOffset = -forward * 34.0f + right * 5.0f + glm::vec3{0.0f, 17.0f, 0.0f};
+        constexpr float cameraDistance = 42.0f;
+        glm::vec3 cameraOffset = -forward * (std::cos(pitch) * cameraDistance) +
+                                 right * 5.0f +
+                                 glm::vec3{0.0f, std::sin(pitch) * cameraDistance, 0.0f};
 
         if (m_options.orbitCamera) {
             const float orbitRadians = m_sceneTimeSeconds * 0.22f;
@@ -1312,7 +1372,7 @@ private:
         }
 
         const glm::vec3 eye = anchor + cameraOffset;
-        const glm::vec3 target = anchor + forward * 8.0f;
+        const glm::vec3 target = anchor + forward * 10.0f + glm::vec3{0.0f, 2.0f, 0.0f};
 
         glm::mat4 view = glm::lookAt(eye, target, glm::vec3{0.0f, 1.0f, 0.0f});
         glm::mat4 projection = glm::perspective(glm::radians(50.0f),

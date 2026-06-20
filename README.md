@@ -69,10 +69,11 @@ The viewer keeps running until the window is closed. Press Escape to close it fr
 Prototype controls:
 
 - `WASD` or XInput left stick moves the player.
+- Mouse rotates the player-follow camera.
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Player movement is camera-relative; sparring movement is character-relative.
 
 ## Architecture Notes
 
