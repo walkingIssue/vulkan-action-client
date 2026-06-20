@@ -101,6 +101,24 @@ void addDiagnostic(std::vector<ScenarioDiagnostic> &diagnostics, std::string cod
     diagnostics.push_back({"error", std::move(code), std::move(fieldPath), std::move(message)});
 }
 
+std::string pathMessage(const std::filesystem::path &path)
+{
+    return path.empty() ? "<empty>" : path.generic_string();
+}
+
+bool fileExists(const std::filesystem::path &path)
+{
+    std::error_code error;
+    return !path.empty() && std::filesystem::is_regular_file(path, error);
+}
+
+void addMissingFileDiagnostic(std::vector<ScenarioDiagnostic> &diagnostics, std::string code, std::string fieldPath,
+                              std::string label, const std::filesystem::path &path)
+{
+    addDiagnostic(diagnostics, std::move(code), std::move(fieldPath),
+                  std::move(label) + " does not exist: " + pathMessage(path));
+}
+
 std::vector<ScenarioDiagnostic> validateScenario(const CombatScenario &scenario)
 {
     std::vector<ScenarioDiagnostic> diagnostics;
@@ -156,6 +174,72 @@ std::vector<ScenarioDiagnostic> validateScenario(const CombatScenario &scenario)
         }
         if (input.command.empty()) {
             addDiagnostic(diagnostics, "missing_input_command", field + "/command", "Input command is required");
+        }
+    }
+
+    return diagnostics;
+}
+
+std::vector<ScenarioDiagnostic> validateContentGraph(
+    const CombatScenario &scenario, const std::vector<content::CompiledMove> &moves,
+    const std::unordered_map<std::string, animation::ProxyAnimationAsset> &animations)
+{
+    std::vector<ScenarioDiagnostic> diagnostics;
+
+    std::unordered_map<std::string, size_t> moveIndexes;
+    for (size_t i = 0; i < moves.size(); ++i) {
+        const content::CompiledMove &move = moves[i];
+        if (!moveIndexes.emplace(move.logicalId, i).second) {
+            addDiagnostic(diagnostics, "duplicate_move_logical_id", "moves/" + std::to_string(i),
+                          "Move logicalId is duplicated in scenario content graph: " + move.logicalId);
+        }
+    }
+
+    std::unordered_set<std::string> animationBindings;
+    for (size_t i = 0; i < scenario.animations.size(); ++i) {
+        const ScenarioAnimationBinding &binding = scenario.animations[i];
+        const std::string field = "animations/" + std::to_string(i);
+        if (!animationBindings.insert(binding.moveLogicalId).second) {
+            addDiagnostic(diagnostics, "duplicate_animation_binding", field + "/move",
+                          "Scenario has duplicate proxy animation binding for move: " + binding.moveLogicalId);
+        }
+        if (!moveIndexes.contains(binding.moveLogicalId)) {
+            addDiagnostic(diagnostics, "unknown_animation_move", field + "/move",
+                          "Proxy animation binding references an unknown move: " + binding.moveLogicalId);
+        }
+    }
+
+    for (size_t moveIndex = 0; moveIndex < moves.size(); ++moveIndex) {
+        const content::CompiledMove &move = moves[moveIndex];
+        if (move.hitboxTracks.empty()) {
+            continue;
+        }
+
+        const auto animationIt = animations.find(move.logicalId);
+        if (animationIt == animations.end()) {
+            addDiagnostic(diagnostics, "missing_move_animation", "moves/" + std::to_string(moveIndex),
+                          "Move has hitbox tracks but no proxy animation binding: " + move.logicalId);
+            continue;
+        }
+
+        std::unordered_set<std::string> socketNames;
+        for (const animation::ProxySocketTrack &socket : animationIt->second.sockets) {
+            socketNames.insert(socket.name);
+        }
+
+        for (const content::CompiledHitboxTrack &hitbox : move.hitboxTracks) {
+            if (socketNames.contains(hitbox.socket)) {
+                continue;
+            }
+
+            std::string trackId = std::to_string(hitbox.trackId);
+            if (hitbox.trackId > 0 && hitbox.trackId <= move.internTable.trackIds.size()) {
+                trackId = move.internTable.trackIds[hitbox.trackId - 1];
+            }
+            addDiagnostic(diagnostics, "missing_hitbox_socket",
+                          "moves/" + move.logicalId + "/hitboxTracks/" + trackId + "/socket",
+                          "Move hitbox references socket '" + hitbox.socket +
+                              "' that is absent from proxy animation bound to move: " + move.logicalId);
         }
     }
 
@@ -777,7 +861,43 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
             return result;
         }
 
-        const content::AuthoringScene scene = content::loadAuthoringScene(resolvePath(result.scenario, result.scenario.mapPath));
+        const std::filesystem::path resolvedMapPath = resolvePath(result.scenario, result.scenario.mapPath);
+        std::vector<std::filesystem::path> resolvedMovePaths;
+        resolvedMovePaths.reserve(result.scenario.movePaths.size());
+        std::vector<std::filesystem::path> resolvedAnimationPaths;
+        resolvedAnimationPaths.reserve(result.scenario.animations.size());
+
+        if (!fileExists(resolvedMapPath)) {
+            addMissingFileDiagnostic(result.diagnostics, "missing_map_file", "map", "Scenario map", resolvedMapPath);
+        }
+        for (size_t i = 0; i < result.scenario.movePaths.size(); ++i) {
+            const std::filesystem::path resolvedPath = resolvePath(result.scenario, result.scenario.movePaths[i]);
+            resolvedMovePaths.push_back(resolvedPath);
+            if (!fileExists(resolvedPath)) {
+                addMissingFileDiagnostic(result.diagnostics, "missing_move_file", "moves/" + std::to_string(i),
+                                         "Scenario move asset", resolvedPath);
+            }
+        }
+        for (size_t i = 0; i < result.scenario.animations.size(); ++i) {
+            const std::filesystem::path resolvedPath = resolvePath(result.scenario, result.scenario.animations[i].path);
+            resolvedAnimationPaths.push_back(resolvedPath);
+            if (!fileExists(resolvedPath)) {
+                addMissingFileDiagnostic(result.diagnostics, "missing_proxy_animation_file",
+                                         "animations/" + std::to_string(i) + "/path",
+                                         "Scenario proxy animation", resolvedPath);
+            }
+        }
+        if (!options.updateGolden && !fileExists(result.goldenPath)) {
+            addMissingFileDiagnostic(result.diagnostics, "missing_golden_file", "golden", "Scenario golden trace",
+                                     result.goldenPath);
+        }
+        if (!result.diagnostics.empty()) {
+            result.status = "error";
+            result.message = "Scenario content graph validation failed";
+            return result;
+        }
+
+        const content::AuthoringScene scene = content::loadAuthoringScene(resolvedMapPath);
         const content::CompileResult compiledWorld = content::compileRuntimeWorld(scene);
         if (!compiledWorld.ok()) {
             result.status = "error";
@@ -789,9 +909,9 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
         }
 
         std::vector<content::CompiledMove> compiledMoves;
-        compiledMoves.reserve(result.scenario.movePaths.size());
-        for (const std::filesystem::path &movePath : result.scenario.movePaths) {
-            const content::MoveAsset move = content::loadMoveAsset(resolvePath(result.scenario, movePath));
+        compiledMoves.reserve(resolvedMovePaths.size());
+        for (const std::filesystem::path &movePath : resolvedMovePaths) {
+            const content::MoveAsset move = content::loadMoveAsset(movePath);
             const content::MoveCompileResult compiledMove = content::compileMoveAsset(move);
             if (!compiledMove.ok()) {
                 result.status = "error";
@@ -805,8 +925,9 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
         }
 
         std::unordered_map<std::string, animation::ProxyAnimationAsset> animations;
-        for (const ScenarioAnimationBinding &binding : result.scenario.animations) {
-            animation::ProxyAnimationAsset asset = animation::loadProxyAnimation(resolvePath(result.scenario, binding.path));
+        for (size_t i = 0; i < result.scenario.animations.size(); ++i) {
+            const ScenarioAnimationBinding &binding = result.scenario.animations[i];
+            animation::ProxyAnimationAsset asset = animation::loadProxyAnimation(resolvedAnimationPaths[i]);
             const content::ValidationResult validation = animation::validateProxyAnimation(asset);
             if (!validation.ok()) {
                 result.status = "error";
@@ -817,6 +938,13 @@ ScenarioRunResult runCombatScenario(CombatScenario scenario, const ScenarioRunOp
                 return result;
             }
             animations[binding.moveLogicalId] = std::move(asset);
+        }
+
+        result.diagnostics = validateContentGraph(result.scenario, compiledMoves, animations);
+        if (!result.diagnostics.empty()) {
+            result.status = "error";
+            result.message = "Scenario content graph validation failed";
+            return result;
         }
 
         simulation::RuntimeWorld world = makeRuntimeWorld(result.scenario, compiledWorld.world);
