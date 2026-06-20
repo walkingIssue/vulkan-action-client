@@ -75,6 +75,7 @@ target_link_libraries(simulation_core PUBLIC
 )
 
 add_library(combat_runtime_core
+    src/combat/combat_collision.cpp
     src/combat/combat_runtime.cpp
 )
 
@@ -300,6 +301,22 @@ if(BUILD_TESTING)
     set_tests_properties(combat_runtime_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;combat;runtime"
+    )
+
+    add_executable(combat_collision_tests
+        tests/combat_collision_tests.cpp
+    )
+
+    target_compile_features(combat_collision_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(combat_collision_tests PRIVATE
+        combat_runtime_core
+    )
+
+    add_test(NAME combat_collision_tests COMMAND combat_collision_tests)
+    set_tests_properties(combat_collision_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;combat;collision"
     )
 
     add_executable(movement_behavior_tests
