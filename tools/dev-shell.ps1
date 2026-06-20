@@ -51,5 +51,29 @@ if ($vulkanSdk) {
 Add-PathEntry (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links")
 Add-PathEntry (Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps")
 
-Write-Host "MSVC, Ninja, and Vulkan SDK environment ready."
+$workspaceTools = Resolve-Path (Join-Path $PSScriptRoot "..\..\tools") -ErrorAction SilentlyContinue
+if ($workspaceTools) {
+    $workspaceToolsPath = $workspaceTools.Path
+    $vcpkgRoot = Join-Path $workspaceToolsPath "vcpkg"
+    if (Test-Path $vcpkgRoot) {
+        $env:VCPKG_ROOT = $vcpkgRoot
+        Add-PathEntry $vcpkgRoot
+    }
+
+    $gitLfs = Get-ChildItem -Path $workspaceToolsPath -Directory -Filter "git-lfs-*" -ErrorAction SilentlyContinue |
+        ForEach-Object { Get-ChildItem -Path $_.FullName -Filter "git-lfs.exe" -Recurse -ErrorAction SilentlyContinue } |
+        Select-Object -First 1
+    if ($gitLfs) {
+        Add-PathEntry $gitLfs.DirectoryName
+    }
+
+    $renderDoc = Get-ChildItem -Path $workspaceToolsPath -Filter "qrenderdoc.exe" -Recurse -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($renderDoc) {
+        Add-PathEntry $renderDoc.DirectoryName
+    }
+}
+
+Write-Host "MSVC, Ninja, Vulkan SDK, vcpkg, and asset tools environment ready."
 Write-Host "VULKAN_SDK=$env:VULKAN_SDK"
+Write-Host "VCPKG_ROOT=$env:VCPKG_ROOT"

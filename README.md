@@ -13,6 +13,8 @@ Detected and prepared:
 - Vulkan SDK 1.4.350.0 at `C:\VulkanSDK\1.4.350.0`
 - Shader tools: `glslc` and `dxc`
 - Vulkan runtime working on Intel Arc A770
+- vcpkg at `C:\Users\Bartek\Documents\Playground\tools\vcpkg`
+- Git LFS 3.7.1 at `C:\Users\Bartek\Documents\Playground\tools\git-lfs-3.7.1`
 
 Git signing is disabled locally for this repository:
 
@@ -32,3 +34,14 @@ From this directory, run:
 ```
 
 That activates the MSVC x64 build environment and adds the Vulkan SDK and WinGet tool links to the current PowerShell process.
+
+It also exposes local workspace tools such as `vcpkg`, `git-lfs`, and portable RenderDoc when available.
+
+## Dependencies
+
+The project uses vcpkg manifest mode. After entering the dev shell:
+
+```powershell
+vcpkg install --triplet x64-windows
+cmake --preset msvc-debug
+```
