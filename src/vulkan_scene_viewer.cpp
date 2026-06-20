@@ -46,6 +46,7 @@
 #include "network/snapshot_client.hpp"
 #include "render/scene_geometry.hpp"
 #include "scene/scene_runtime.hpp"
+#include "visual_lab/visual_lab.hpp"
 
 namespace
 {
@@ -76,6 +77,9 @@ struct ViewerOptions
     uint8_t networkClientId = 0;
     uint32_t frames = 0;
     bool orbitCamera = false;
+    bool visualLab = false;
+    std::filesystem::path visualLabMovePath;
+    std::filesystem::path visualLabProxyAnimationPath;
     vac::host::CommonHostOptions common;
 };
 
@@ -149,10 +153,21 @@ ViewerOptions parseOptions(int argc, char **argv)
     vac::host::CommandLine commandLine{argc, argv};
     ViewerOptions options;
     options.common = vac::host::parseCommonOptions(commandLine);
-    vac::host::rejectUnsupportedCommonOptions(options.common, {"--scene", "--frames", "--result-file"});
+    vac::host::rejectUnsupportedCommonOptions(
+        options.common, {"--scene", "--frames", "--ticks", "--result-file", "--offline", "--hidden-window"});
 
-    options.scenePath = vac::defaultProjectRoot() / "config/scenes/bootstrap.scene.json";
+    if (commandLine.consumeFlag("--visual-lab")) {
+        options.visualLab = true;
+    }
+
+    const vac::visual_lab::VisualLabAssetPaths labDefaults = vac::visual_lab::defaultVisualLabAssetPaths();
+    options.scenePath = options.visualLab
+        ? labDefaults.mapPath
+        : vac::defaultProjectRoot() / "config/scenes/bootstrap.scene.json";
     options.controlProfilePath = vac::defaultControlProfilePath();
+    options.visualLabMovePath = labDefaults.movePath;
+    options.visualLabProxyAnimationPath = labDefaults.proxyAnimationPath;
+
     if (options.common.scene.has_value()) {
         options.scenePath = *options.common.scene;
     }
@@ -162,6 +177,18 @@ ViewerOptions parseOptions(int argc, char **argv)
 
     if (const std::optional<std::string> controlProfile = commandLine.consumeValue("--control-profile")) {
         options.controlProfilePath = *controlProfile;
+    }
+    if (const std::optional<std::string> movePath = commandLine.consumeValue("--move")) {
+        if (!options.visualLab) {
+            throw vac::host::ParseError("--move requires --visual-lab");
+        }
+        options.visualLabMovePath = *movePath;
+    }
+    if (const std::optional<std::string> animationPath = commandLine.consumeValue("--proxy-animation")) {
+        if (!options.visualLab) {
+            throw vac::host::ParseError("--proxy-animation requires --visual-lab");
+        }
+        options.visualLabProxyAnimationPath = *animationPath;
     }
     if (const std::optional<std::string> networkServer = commandLine.consumeValue("--net-server")) {
         options.networkServer = *networkServer;
@@ -219,12 +246,26 @@ public:
         : m_options(std::move(options))
     {
         loadInitialControlProfile();
-        m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
+        if (m_options.visualLab) {
+            vac::visual_lab::VisualLabAssetPaths paths;
+            paths.mapPath = m_options.scenePath;
+            paths.movePath = m_options.visualLabMovePath;
+            paths.proxyAnimationPath = m_options.visualLabProxyAnimationPath;
+            const vac::visual_lab::VisualLabScene labScene = vac::visual_lab::buildVisualLabScene(paths);
+            if (!labScene.diagnostics.empty()) {
+                throw std::runtime_error("Visual lab asset validation failed: " + labScene.diagnostics.front());
+            }
+            m_scene = labScene.scene;
+            m_lineData = labScene.debugDraw;
+            m_resultDiagnostics = vac::visual_lab::summaryDiagnostics(labScene.summary);
+        } else {
+            m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
+            m_lineData = vac::buildSceneLineData(m_scene);
+        }
         findControllableActors();
         configureNetworkActors();
         vac::refreshSceneBounds(m_scene);
         m_renderData = vac::buildSceneRenderData(m_scene);
-        m_lineData = vac::buildSceneLineData(m_scene);
         initializeCombatActors();
         initializeCameraAnchor();
         initializeNetworkClient();
@@ -243,6 +284,8 @@ public:
         vkDeviceWaitIdle(m_device);
     }
 
+    const std::vector<std::string> &resultDiagnostics() const { return m_resultDiagnostics; }
+
 private:
     ViewerOptions m_options;
     vac::ControlProfile m_controlProfile;
@@ -251,6 +294,7 @@ private:
     vac::SceneRuntime m_scene;
     vac::SceneRenderData m_renderData;
     vac::SceneDrawData m_lineData;
+    std::vector<std::string> m_resultDiagnostics;
     std::optional<vac::SceneInstance> m_networkActorTemplate;
     std::vector<vac::combat::ActorState> m_actorStates;
     std::unique_ptr<vac::net::SnapshotClient> m_networkClient;
@@ -348,6 +392,9 @@ private:
         }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        if (m_options.common.hiddenWindow) {
+            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        }
         m_window = glfwCreateWindow(kWidth, kHeight, "Vulkan Action Client - Scene Viewer", nullptr, nullptr);
         if (!m_window) {
             throw std::runtime_error("glfwCreateWindow failed");
@@ -470,6 +517,10 @@ private:
 
     void configureNetworkActors()
     {
+        if (m_options.visualLab || m_options.common.offline) {
+            return;
+        }
+
         if (m_options.networkClientId == 0) {
             if (m_playerIndex.has_value()) {
                 m_networkActorByClientId[1] = *m_playerIndex;
@@ -628,6 +679,10 @@ private:
 
     void initializeNetworkClient()
     {
+        if (m_options.visualLab || m_options.common.offline) {
+            return;
+        }
+
         if (m_options.networkClientId == 0) {
             return;
         }
@@ -2358,9 +2413,12 @@ int main(int argc, char **argv)
         viewer.run();
         if (resultFile.has_value()) {
             vac::host::HostResult result = vac::host::resultFromOptions("vulkan_scene_viewer", options.common);
-            result.message = options.frames > 0
+            result.message = options.visualLab
+                ? fmt::format("Visual lab rendered {} frame(s)", options.frames)
+                : options.frames > 0
                 ? fmt::format("Rendered {} frame(s)", options.frames)
                 : "Viewer exited normally";
+            result.diagnostics = viewer.resultDiagnostics();
             vac::host::writeResultFile(*resultFile, result);
         }
         return 0;

@@ -44,6 +44,24 @@ glm::vec2 readVec2(const json &value, glm::vec2 fallback)
     };
 }
 
+glm::vec3 readVec3Flexible(const json &value, glm::vec3 fallback)
+{
+    if (!value.is_array()) {
+        return fallback;
+    }
+
+    if (value.size() == 3) {
+        return readVec3(value, fallback);
+    }
+
+    if (value.size() == 2) {
+        const glm::vec2 size = readVec2(value, {fallback.x, fallback.z});
+        return {size.x, fallback.y, size.y};
+    }
+
+    return fallback;
+}
+
 Transform readTransform(const json &value)
 {
     Transform transform;
@@ -136,6 +154,15 @@ Bounds floorBounds(const glm::vec2 &size)
     return bounds;
 }
 
+Bounds boxBounds(const glm::vec3 &size)
+{
+    const glm::vec3 half = size * 0.5f;
+    Bounds bounds;
+    includePoint(bounds, -half);
+    includePoint(bounds, half);
+    return bounds;
+}
+
 ModelStats loadModel(const std::string &id, const std::filesystem::path &path)
 {
     if (!std::filesystem::exists(path)) {
@@ -219,10 +246,15 @@ SceneRuntime loadScene(const std::filesystem::path &scenePath,
         instance.name = item.value("name", instance.id);
         instance.type = item.value("type", "unknown");
         instance.size = readVec2(item.value("size", json::array()), instance.size);
+        instance.size3 = readVec3Flexible(item.value("size", json::array()), {instance.size.x, 0.02f, instance.size.y});
+        instance.baseColor = glm::vec4{readVec3(item.value("baseColor", json::array()), glm::vec3{0.7f}), 1.0f};
         instance.transform = readTransform(item.value("transform", json::object()));
 
         if (instance.type == "floor") {
             instance.worldBounds = transformBoundsInternal(floorBounds(instance.size), instance.transform);
+        } else if (instance.type == "box" || instance.type == "actor_root" || instance.type == "sphere" ||
+                   instance.type == "capsule" || instance.type == "cylinder") {
+            instance.worldBounds = transformBoundsInternal(boxBounds(instance.size3), instance.transform);
         }
 
         includeBounds(runtime.worldBounds, instance.worldBounds);
@@ -261,6 +293,9 @@ void refreshSceneBounds(SceneRuntime &scene)
     for (ProceduralInstance &instance : scene.procedural) {
         if (instance.type == "floor") {
             instance.worldBounds = transformBoundsInternal(floorBounds(instance.size), instance.transform);
+        } else if (instance.type == "box" || instance.type == "actor_root" || instance.type == "sphere" ||
+                   instance.type == "capsule" || instance.type == "cylinder") {
+            instance.worldBounds = transformBoundsInternal(boxBounds(instance.size3), instance.transform);
         }
         includeBounds(scene.worldBounds, instance.worldBounds);
     }

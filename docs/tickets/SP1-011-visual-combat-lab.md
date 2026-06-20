@@ -1,6 +1,6 @@
 # SP1-011: Visual Map and Combat Lab
 
-Status: planned
+Status: complete
 Branch: sprint01/sp1-011-visual-combat-lab
 Start commit: `713afe1`
 Source plan: `docs/sprint-01-implementation-plan.md`
@@ -31,7 +31,7 @@ Add a temporary visual lab mode to the existing Vulkan viewer so Sprint 1 map, m
 - `combat_runtime_core` exposes authored move phases, hitbox/hurtbox tracks, and collision query helpers.
 - `animation_core` can sample proxy root and socket keyframes.
 - `render/scene_geometry` can draw the legacy floor grid and scene bounds, but it does not render authored primitive map boxes or Sprint 1 combat debug overlays yet.
-- SP1-010 scenario playback is active in parallel, so this ticket should not depend on a final scenario fixture schema until that branch merges.
+- SP1-010 scenario playback has merged, but this ticket keeps the first visual lab slice on existing content assets rather than depending on scenario playback control flow.
 
 ## Data Flow
 
@@ -95,11 +95,21 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Claimed as Aetoun after SP1-012 merged and while Lara/Vera work on SP1-010 in parallel.
+- 2026-06-20: Reconciled onto the pushed SP1-010 merge before implementation.
+- 2026-06-20: Added `visual_lab_core`, primitive map geometry rendering, debug overlay summaries, `vulkan_scene_viewer --visual-lab --offline`, unit tests, and a process smoke.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug --target visual_lab_tests vulkan_scene_viewer` passed.
+- `ctest --test-dir build/msvc-debug -R "visual_lab" --output-on-failure` passed: 2/2 tests.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-viewer --output-on-failure` passed: 3/3 tests.
+- `ctest --preset msvc-debug-combat --output-on-failure` passed: 13/13 tests.
+- `ctest --preset msvc-debug --output-on-failure` passed: 24/24 tests.
+- `build/msvc-debug/test-artifacts/visual_lab_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, `frames: 3`, `ticks: 20`, and visual lab overlay diagnostics.
+- Full legacy viewer/characterization tests still require ignored local `assets/extracted` paladin files; the new `visual_lab_smoke` path does not depend on imported model assets.
 
 ## Final Commits
 
-Pending.
+- `b35d713` Add SP1-011 visual combat lab

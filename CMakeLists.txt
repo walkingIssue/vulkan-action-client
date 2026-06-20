@@ -126,6 +126,24 @@ target_link_libraries(map_command_core PUBLIC
     nlohmann_json::nlohmann_json
 )
 
+add_library(visual_lab_core
+    src/visual_lab/visual_lab.cpp
+)
+
+target_compile_features(visual_lab_core PUBLIC cxx_std_20)
+
+target_include_directories(visual_lab_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(visual_lab_core PUBLIC
+    animation_core
+    combat_runtime_core
+    content_core
+    scene_core
+    simulation_core
+)
+
 add_library(combat_scenario_core
     src/combat/combat_scenario.cpp
 )
@@ -305,6 +323,7 @@ target_link_libraries(vulkan_scene_viewer PRIVATE
     host_core
     input_core
     network_core
+    visual_lab_core
     Vulkan::Vulkan
     fmt::fmt
     glfw
@@ -427,6 +446,22 @@ if(BUILD_TESTING)
     set_tests_properties(map_command_runner_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;content;authoring;map"
+    )
+
+    add_executable(visual_lab_tests
+        tests/visual_lab_tests.cpp
+    )
+
+    target_compile_features(visual_lab_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(visual_lab_tests PRIVATE
+        visual_lab_core
+    )
+
+    add_test(NAME visual_lab_tests COMMAND visual_lab_tests)
+    set_tests_properties(visual_lab_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;viewer;visual;combat;map"
     )
 
     add_test(
@@ -584,6 +619,21 @@ if(BUILD_TESTING)
     set_tests_properties(viewer_smoke PROPERTIES
         TIMEOUT 30
         LABELS "viewer;smoke;characterization"
+    )
+
+    add_test(
+        NAME visual_lab_smoke
+        COMMAND vulkan_scene_viewer
+                --visual-lab
+                --offline
+                --scene "${CMAKE_CURRENT_SOURCE_DIR}/content/maps/basic_primitive_arena.map.json"
+                --frames 3
+                --ticks 20
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/visual_lab_smoke_result.json"
+    )
+    set_tests_properties(visual_lab_smoke PROPERTIES
+        TIMEOUT 30
+        LABELS "viewer;smoke;visual;process"
     )
 
     add_test(
