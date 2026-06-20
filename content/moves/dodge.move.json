@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "move-guid-dodge",
+  "logicalId": "move.dodge",
+  "durationTicks": 18,
+  "tags": ["startup", "active", "recovery", "dodge", "invulnerable"],
+  "knownMoves": ["move.light_attack", "move.light_followup", "move.dodge", "move.hit_reaction"],
+  "input": {
+    "command": "dodge",
+    "bufferTicks": 6
+  },
+  "phases": [
+    {"id": "startup", "beginTick": 0, "endTick": 3, "tags": ["startup"]},
+    {"id": "active", "beginTick": 3, "endTick": 11, "tags": ["active", "dodge", "invulnerable"]},
+    {"id": "recovery", "beginTick": 11, "endTick": 18, "tags": ["recovery"]}
+  ],
+  "movementTracks": [
+    {"id": "dodge_step", "beginTick": 1, "endTick": 8, "translation": [0.0, 0.0, -3.0], "tags": ["dodge"]}
+  ],
+  "hitboxTracks": [],
+  "hurtboxOverrides": [
+    {"id": "dodge_invulnerable", "beginTick": 3, "endTick": 11, "profile": "strike_invulnerable", "tags": ["invulnerable"]}
+  ],
+  "cancels": [],
+  "resources": {
+    "staminaCost": 8.0
+  },
+  "events": [
+    {"id": "dodge_start", "tick": 0, "type": "debug_event", "payload": "dodge_start", "tags": ["startup"]}
+  ]
+}

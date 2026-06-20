@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "move-guid-light-followup",
+  "logicalId": "move.light_followup",
+  "durationTicks": 28,
+  "tags": ["startup", "active", "recovery", "attack", "light", "weapon"],
+  "knownMoves": ["move.light_attack", "move.light_followup", "move.dodge", "move.hit_reaction"],
+  "input": {
+    "command": "light_attack",
+    "bufferTicks": 8
+  },
+  "phases": [
+    {"id": "startup", "beginTick": 0, "endTick": 6, "tags": ["startup"]},
+    {"id": "active", "beginTick": 6, "endTick": 10, "tags": ["active", "attack"]},
+    {"id": "recovery", "beginTick": 10, "endTick": 28, "tags": ["recovery"]}
+  ],
+  "movementTracks": [
+    {"id": "followup_step", "beginTick": 2, "endTick": 8, "translation": [0.0, 0.0, 0.9], "tags": ["attack"]}
+  ],
+  "hitboxTracks": [
+    {"id": "followup_blade", "beginTick": 6, "endTick": 10, "shape": "box", "socket": "weapon_tip", "size": [0.55, 0.45, 1.2], "offset": [0.0, 1.1, 0.35], "tags": ["weapon", "light"]}
+  ],
+  "hurtboxOverrides": [],
+  "cancels": [],
+  "resources": {
+    "staminaCost": 8.0
+  },
+  "events": [
+    {"id": "followup_start", "tick": 2, "type": "animation_event", "payload": "sword_followup_start", "tags": ["startup"]}
+  ]
+}

@@ -29,6 +29,7 @@ struct InputFrame
     bool cameraSteering = false;
     bool sprint = false;
     std::optional<glm::vec2> moveTarget;
+    std::vector<std::string> pressedCommands;
 };
 
 struct RuntimeActor
