@@ -1,22 +1,27 @@
 # SP2-001: Intake Summary
 
-Status: not started
+Status: intake guardrail only
 Branch: not created
 Source plan: none in repository yet
+Last reviewed: 2026-06-20
 
 ## Summary
 
-`SP2-001` is not currently defined as an implementation ticket. The only `SP2` reference in the repository is the future-sprint branch naming example in `docs/agent-ticket-workflow.md`.
+`SP2-001` is not currently defined as an implementation ticket. There is no Sprint 02 implementation plan in the repository, and there are no accepted goals, non-goals, branches, data flows, test plans, or acceptance criteria for a Sprint 02 kickoff.
 
-Agents should not start implementation from `SP2-001` until a Sprint 02 implementation plan exists and names the ticket scope, branch, data flow, test plan, and acceptance criteria.
+Agents must not start implementation from `SP2-001` until a Sprint 02 implementation plan exists and names the ticket scope, branch, data flow, test plan, and acceptance criteria.
+
+This file is a stop sign, not a work ticket.
 
 ## Current Correct Work
 
-The current active Sprint 01 sequence is:
+The currently defined implementation track is still Sprint 01:
 
-1. `SP1-001`: CMake and CTest spine - complete.
-2. `SP1-002`: Common host CLI and result files - complete.
-3. `SP1-003`: Characterization before extraction - started.
+1. `SP1-001` through `SP1-008` are merged.
+2. `SP1-009`: Proxy animation, keyframes, and interpolation is the active in-flight ticket branch.
+3. `SP1-010`: Combat scenario runner and golden traces is the next defined implementation ticket after `SP1-009` is verified and merged.
+
+If an agent is looking for the next task, it should use `docs/sprint-01-implementation-plan.md` and the committed ticket/result documents under `docs/tickets/`, not this `SP2-001` placeholder.
 
 ## Before Starting SP2-001
 
