@@ -161,6 +161,14 @@ Run the regression suite:
 ctest --preset msvc-debug
 ```
 
+The canonical `network_e2e` CTest uses the compiled `network_e2e_runner` and does not require PowerShell process orchestration:
+
+```powershell
+.\build\msvc-debug\network_e2e_runner.exe --result-file build/msvc-debug/test-artifacts/network_e2e_result.json --headless
+ctest --preset msvc-debug-network
+ctest --preset msvc-debug-e2e
+```
+
 ## Architecture Notes
 
 See `docs/simulation-presentation-split.md` for the intended split between authoritative gameplay simulation and visual presentation.
