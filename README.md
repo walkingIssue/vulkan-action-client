@@ -64,7 +64,13 @@ Build and run the Vulkan scene viewer:
 .\tools\run-scene-viewer.ps1
 ```
 
-The viewer keeps running until the window is closed. Press Escape to close it from the keyboard. By default the camera orbits the bootstrap scene; pass `--static-camera` to hold the camera still, or `--frames 3` for a short smoke test.
+The viewer keeps running until the window is closed. Press Escape to close it from the keyboard. By default the camera follows the player model; pass `--orbit-camera` to use the old orbiting inspection camera, or `--frames 3` for a short smoke test.
+
+Prototype controls:
+
+- `WASD` or XInput left stick moves the player.
+- Arrow keys move the sparring partner.
+- Escape closes the viewer.
 
 ## Architecture Notes
 

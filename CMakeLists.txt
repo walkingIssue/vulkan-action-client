@@ -111,3 +111,7 @@ target_link_libraries(vulkan_scene_viewer PRIVATE
     glm::glm
     spdlog::spdlog
 )
+
+if(WIN32)
+    target_link_libraries(vulkan_scene_viewer PRIVATE Xinput.lib)
+endif()

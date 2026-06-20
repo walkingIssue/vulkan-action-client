@@ -19,6 +19,8 @@ DirectInput exists and is COM-based, but it is legacy for most modern game use. 
 
 For the first controller path, use XInput. It is narrow, stable, and enough for Xbox-compatible pads while we are still building the combat input model.
 
+The current scene viewer has the first thin version of this: XInput left stick and `WASD` move the player preview, while arrow keys move the sparring partner. This is prototype plumbing, not the final combat input API.
+
 ## Desired Engine Shape
 
 The platform layer should collect input events as soon as the OS delivers them:

@@ -67,5 +67,7 @@ struct SceneRuntime
 std::filesystem::path defaultProjectRoot();
 SceneRuntime loadScene(const std::filesystem::path &scenePath,
                        const std::filesystem::path &projectRoot);
+Bounds transformBounds(const Bounds &bounds, const Transform &transform);
+void refreshSceneBounds(SceneRuntime &scene);
 std::string formatBounds(const Bounds &bounds);
 } // namespace vac

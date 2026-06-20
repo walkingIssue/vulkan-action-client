@@ -1,9 +1,21 @@
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#include <Xinput.h>
+#endif
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -29,7 +41,7 @@ namespace
 {
 constexpr uint32_t kWidth = 1280;
 constexpr uint32_t kHeight = 720;
-constexpr int kMaxFramesInFlight = 2;
+constexpr int kMaxFramesInFlight = 1;
 
 const std::vector<const char *> kValidationLayers = {
     "VK_LAYER_KHRONOS_validation",
@@ -45,7 +57,7 @@ struct ViewerOptions
 {
     std::filesystem::path scenePath;
     uint32_t frames = 0;
-    bool orbitCamera = true;
+    bool orbitCamera = false;
 };
 
 struct QueueFamilyIndices
@@ -70,6 +82,7 @@ struct Buffer
 {
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkDeviceSize size = 0;
 };
 
 struct Image
@@ -104,6 +117,8 @@ ViewerOptions parseOptions(int argc, char **argv)
             options.scenePath = argv[++i];
         } else if (arg == "--frames" && i + 1 < argc) {
             options.frames = static_cast<uint32_t>(std::max(0, std::stoi(argv[++i])));
+        } else if (arg == "--orbit-camera") {
+            options.orbitCamera = true;
         } else if (arg == "--static-camera") {
             options.orbitCamera = false;
         }
@@ -138,6 +153,7 @@ public:
     {
         m_scene = vac::loadScene(m_options.scenePath, vac::defaultProjectRoot());
         m_drawData = vac::buildSceneDrawData(m_scene);
+        findControllableActors();
     }
 
     ~VulkanSceneViewer()
@@ -187,6 +203,11 @@ private:
     std::vector<VkFence> m_imagesInFlight;
     size_t m_currentFrame = 0;
     float m_sceneTimeSeconds = 0.0f;
+    float m_fpsAccumulatorSeconds = 0.0f;
+    uint32_t m_fpsFrames = 0;
+    std::optional<size_t> m_playerIndex;
+    std::optional<size_t> m_sparringIndex;
+    bool m_sceneGeometryDirty = false;
     bool m_framebufferResized = false;
 
     static void framebufferResizeCallback(GLFWwindow *window, int, int)
@@ -246,6 +267,7 @@ private:
     {
         uint32_t frameCount = 0;
         const auto start = std::chrono::steady_clock::now();
+        auto previous = start;
 
         while (!glfwWindowShouldClose(m_window)) {
             glfwPollEvents();
@@ -254,8 +276,12 @@ private:
             }
 
             const auto now = std::chrono::steady_clock::now();
+            const float deltaSeconds = std::min(std::chrono::duration<float>(now - previous).count(), 0.1f);
+            previous = now;
             m_sceneTimeSeconds = std::chrono::duration<float>(now - start).count();
+            updateSimulation(deltaSeconds);
             drawFrame();
+            updateWindowTitle(deltaSeconds);
 
             if (m_options.frames > 0 && ++frameCount >= m_options.frames) {
                 break;
@@ -266,6 +292,153 @@ private:
                 break;
             }
         }
+    }
+
+    void findControllableActors()
+    {
+        for (size_t i = 0; i < m_scene.instances.size(); ++i) {
+            if (m_scene.instances[i].id == "player_preview") {
+                m_playerIndex = i;
+            } else if (m_scene.instances[i].id == "sparring_partner") {
+                m_sparringIndex = i;
+            }
+        }
+    }
+
+    void updateSimulation(float deltaSeconds)
+    {
+        bool moved = false;
+
+        if (m_playerIndex.has_value()) {
+            moved |= applyMovement(*m_playerIndex, readPlayerMove(), deltaSeconds, 18.0f);
+        }
+
+        if (m_sparringIndex.has_value()) {
+            moved |= applyMovement(*m_sparringIndex,
+                                   readKeyboardMove(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN),
+                                   deltaSeconds,
+                                   14.0f);
+        }
+
+        if (moved) {
+            vac::refreshSceneBounds(m_scene);
+            m_drawData = vac::buildSceneDrawData(m_scene);
+            m_sceneGeometryDirty = true;
+        }
+    }
+
+    glm::vec2 readPlayerMove() const
+    {
+        glm::vec2 move = readKeyboardMove(GLFW_KEY_A, GLFW_KEY_D, GLFW_KEY_W, GLFW_KEY_S);
+
+#ifdef _WIN32
+        XINPUT_STATE state{};
+        if (XInputGetState(0, &state) == ERROR_SUCCESS) {
+            const glm::vec2 stick = normalizedThumbstick(state.Gamepad.sThumbLX,
+                                                        state.Gamepad.sThumbLY,
+                                                        XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+            if (glm::dot(stick, stick) > 0.0f) {
+                move += glm::vec2{stick.x, -stick.y};
+            }
+        }
+#endif
+
+        return normalizedMove(move);
+    }
+
+    glm::vec2 readKeyboardMove(int leftKey, int rightKey, int forwardKey, int backwardKey) const
+    {
+        glm::vec2 move{0.0f};
+        if (glfwGetKey(m_window, leftKey) == GLFW_PRESS) {
+            move.x -= 1.0f;
+        }
+        if (glfwGetKey(m_window, rightKey) == GLFW_PRESS) {
+            move.x += 1.0f;
+        }
+        if (glfwGetKey(m_window, forwardKey) == GLFW_PRESS) {
+            move.y -= 1.0f;
+        }
+        if (glfwGetKey(m_window, backwardKey) == GLFW_PRESS) {
+            move.y += 1.0f;
+        }
+        return normalizedMove(move);
+    }
+
+    static glm::vec2 normalizedMove(glm::vec2 move)
+    {
+        const float lengthSquared = glm::dot(move, move);
+        if (lengthSquared > 1.0f) {
+            return move / std::sqrt(lengthSquared);
+        }
+        return move;
+    }
+
+#ifdef _WIN32
+    static glm::vec2 normalizedThumbstick(SHORT rawX, SHORT rawY, SHORT deadzone)
+    {
+        const glm::vec2 value{static_cast<float>(rawX), static_cast<float>(rawY)};
+        const float magnitude = std::sqrt(glm::dot(value, value));
+        if (magnitude <= static_cast<float>(deadzone)) {
+            return {0.0f, 0.0f};
+        }
+
+        const float normalizedMagnitude = std::min((magnitude - static_cast<float>(deadzone)) /
+                                                       (32767.0f - static_cast<float>(deadzone)),
+                                                   1.0f);
+        return (value / magnitude) * normalizedMagnitude;
+    }
+#endif
+
+    bool applyMovement(size_t actorIndex, glm::vec2 move, float deltaSeconds, float speed)
+    {
+        if (glm::dot(move, move) <= 0.0001f) {
+            return false;
+        }
+
+        vac::SceneInstance &actor = m_scene.instances[actorIndex];
+        actor.transform.translation.x += move.x * speed * deltaSeconds;
+        actor.transform.translation.z += move.y * speed * deltaSeconds;
+        actor.transform.rotationDegrees.y = glm::degrees(std::atan2(move.x, move.y));
+        clampToArena(actor.transform.translation);
+        return true;
+    }
+
+    void clampToArena(glm::vec3 &position) const
+    {
+        for (const vac::ProceduralInstance &instance : m_scene.procedural) {
+            if (instance.type != "floor") {
+                continue;
+            }
+
+            const glm::vec2 half = instance.size * 0.5f - glm::vec2{5.0f};
+            position.x = std::clamp(position.x, -half.x, half.x);
+            position.z = std::clamp(position.z, -half.y, half.y);
+            return;
+        }
+    }
+
+    void updateWindowTitle(float deltaSeconds)
+    {
+        m_fpsAccumulatorSeconds += deltaSeconds;
+        ++m_fpsFrames;
+
+        if (m_fpsAccumulatorSeconds < 0.5f) {
+            return;
+        }
+
+        const float fps = static_cast<float>(m_fpsFrames) / m_fpsAccumulatorSeconds;
+        glm::vec3 playerPosition{0.0f};
+        if (m_playerIndex.has_value()) {
+            playerPosition = m_scene.instances[*m_playerIndex].transform.translation;
+        }
+
+        const std::string title = fmt::format("Vulkan Action Client - {:.0f} FPS | player x={:.1f} z={:.1f}",
+                                             fps,
+                                             playerPosition.x,
+                                             playerPosition.z);
+        glfwSetWindowTitle(m_window, title.c_str());
+        m_fpsAccumulatorSeconds = 0.0f;
+        m_fpsFrames = 0;
     }
 
     void cleanupSwapChain()
@@ -965,11 +1138,32 @@ private:
 
     void createVertexBuffer(const std::vector<vac::SceneVertex> &vertices, Buffer &buffer)
     {
-        const VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+        if (vertices.empty()) {
+            return;
+        }
+
+        const VkDeviceSize bufferSize = sizeof(vac::SceneVertex) * vertices.size();
         createBuffer(bufferSize,
                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      buffer);
+        buffer.size = bufferSize;
+
+        uploadVertexBuffer(vertices, buffer);
+    }
+
+    void uploadVertexBuffer(const std::vector<vac::SceneVertex> &vertices, Buffer &buffer)
+    {
+        if (vertices.empty()) {
+            return;
+        }
+
+        const VkDeviceSize bufferSize = sizeof(vac::SceneVertex) * vertices.size();
+        if (buffer.buffer == VK_NULL_HANDLE || bufferSize > buffer.size) {
+            destroyBuffer(buffer);
+            createVertexBuffer(vertices, buffer);
+            return;
+        }
 
         void *data = nullptr;
         vkMapMemory(m_device, buffer.memory, 0, bufferSize, 0, &data);
@@ -999,15 +1193,21 @@ private:
     glm::mat4 viewProjection() const
     {
         vac::Bounds focusBounds;
-        for (const vac::SceneInstance &instance : m_scene.instances) {
-            if (!instance.worldBounds.valid) {
-                continue;
-            }
-            if (!focusBounds.valid) {
-                focusBounds = instance.worldBounds;
-            } else {
-                focusBounds.min = glm::min(focusBounds.min, instance.worldBounds.min);
-                focusBounds.max = glm::max(focusBounds.max, instance.worldBounds.max);
+        if (m_playerIndex.has_value()) {
+            focusBounds = m_scene.instances[*m_playerIndex].worldBounds;
+        }
+
+        if (!focusBounds.valid) {
+            for (const vac::SceneInstance &instance : m_scene.instances) {
+                if (!instance.worldBounds.valid) {
+                    continue;
+                }
+                if (!focusBounds.valid) {
+                    focusBounds = instance.worldBounds;
+                } else {
+                    focusBounds.min = glm::min(focusBounds.min, instance.worldBounds.min);
+                    focusBounds.max = glm::max(focusBounds.max, instance.worldBounds.max);
+                }
             }
         }
 
@@ -1028,7 +1228,7 @@ private:
         const float cameraDistance = focusRadius * 2.4f;
         const float cameraHeight = std::max(focusRadius * 0.95f, 10.0f);
 
-        glm::vec3 cameraOffset{cameraDistance * 0.62f, cameraHeight, cameraDistance};
+        glm::vec3 cameraOffset{cameraDistance * 0.50f, cameraHeight, cameraDistance};
         if (m_options.orbitCamera) {
             const float orbitRadians = m_sceneTimeSeconds * 0.22f;
             const glm::mat4 orbit = glm::rotate(glm::mat4{1.0f}, orbitRadians, glm::vec3{0.0f, 1.0f, 0.0f});
@@ -1150,6 +1350,12 @@ private:
     void drawFrame()
     {
         vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+
+        if (m_sceneGeometryDirty) {
+            uploadVertexBuffer(m_drawData.triangleVertices, m_triangleBuffer);
+            uploadVertexBuffer(m_drawData.lineVertices, m_lineBuffer);
+            m_sceneGeometryDirty = false;
+        }
 
         uint32_t imageIndex = 0;
         VkResult result = vkAcquireNextImageKHR(m_device,
@@ -1350,6 +1556,7 @@ private:
             vkFreeMemory(m_device, buffer.memory, nullptr);
             buffer.memory = VK_NULL_HANDLE;
         }
+        buffer.size = 0;
     }
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)

@@ -101,7 +101,7 @@ glm::mat4 transformMatrix(const Transform &transform)
     return matrix;
 }
 
-Bounds transformBounds(const Bounds &bounds, const Transform &transform)
+Bounds transformBoundsInternal(const Bounds &bounds, const Transform &transform)
 {
     if (!bounds.valid) {
         return {};
@@ -222,7 +222,7 @@ SceneRuntime loadScene(const std::filesystem::path &scenePath,
         instance.transform = readTransform(item.value("transform", json::object()));
 
         if (instance.type == "floor") {
-            instance.worldBounds = transformBounds(floorBounds(instance.size), instance.transform);
+            instance.worldBounds = transformBoundsInternal(floorBounds(instance.size), instance.transform);
         }
 
         includeBounds(runtime.worldBounds, instance.worldBounds);
@@ -241,12 +241,39 @@ SceneRuntime loadScene(const std::filesystem::path &scenePath,
             throw std::runtime_error(fmt::format("Entity '{}' references unknown model '{}'", instance.id, instance.modelId));
         }
 
-        instance.worldBounds = transformBounds(modelIt->second.localBounds, instance.transform);
+        instance.worldBounds = transformBoundsInternal(modelIt->second.localBounds, instance.transform);
         includeBounds(runtime.worldBounds, instance.worldBounds);
         runtime.instances.push_back(instance);
     }
 
     return runtime;
+}
+
+Bounds transformBounds(const Bounds &bounds, const Transform &transform)
+{
+    return transformBoundsInternal(bounds, transform);
+}
+
+void refreshSceneBounds(SceneRuntime &scene)
+{
+    scene.worldBounds = {};
+
+    for (ProceduralInstance &instance : scene.procedural) {
+        if (instance.type == "floor") {
+            instance.worldBounds = transformBoundsInternal(floorBounds(instance.size), instance.transform);
+        }
+        includeBounds(scene.worldBounds, instance.worldBounds);
+    }
+
+    for (SceneInstance &instance : scene.instances) {
+        const auto modelIt = scene.models.find(instance.modelId);
+        if (modelIt == scene.models.end()) {
+            throw std::runtime_error(fmt::format("Entity '{}' references unknown model '{}'", instance.id, instance.modelId));
+        }
+
+        instance.worldBounds = transformBoundsInternal(modelIt->second.localBounds, instance.transform);
+        includeBounds(scene.worldBounds, instance.worldBounds);
+    }
 }
 
 std::string formatBounds(const Bounds &bounds)
