@@ -61,6 +61,15 @@ ctest --preset msvc-debug-characterization
 ctest --preset msvc-debug-viewer
 ```
 
+The legacy viewer and characterization tests use ignored extracted paladin assets. Before running the full viewer suite
+in a fresh worktree, run the focused preflight:
+
+```powershell
+.\build\msvc-debug\asset_fixture_check.exe --result-file build/msvc-debug/test-artifacts/asset_fixture_check_result.json
+```
+
+`visual_lab_smoke` renders Sprint 1 primitive content and does not require the imported paladin asset.
+
 The project uses vcpkg manifest mode through `CMakePresets.json`; CMake runs vcpkg install during configure. The PowerShell scripts in `tools/` are convenience wrappers around the same preset path.
 
 ## Host Automation

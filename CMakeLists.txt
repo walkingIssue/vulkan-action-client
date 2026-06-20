@@ -270,6 +270,20 @@ target_link_libraries(scene_probe PRIVATE
     host_core
 )
 
+add_executable(asset_fixture_check
+    src/asset_fixture_check.cpp
+)
+
+target_compile_features(asset_fixture_check PRIVATE cxx_std_20)
+
+target_compile_definitions(asset_fixture_check PRIVATE
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(asset_fixture_check PRIVATE
+    host_core
+)
+
 add_executable(map_command_runner
     src/map_command_runner.cpp
 )
@@ -554,6 +568,28 @@ if(BUILD_TESTING)
     set_tests_properties(host_cli_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;host"
+    )
+
+    add_test(
+        NAME asset_fixture_check
+        COMMAND asset_fixture_check
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/asset_fixture_check_result.json"
+    )
+    set_tests_properties(asset_fixture_check PROPERTIES
+        TIMEOUT 10
+        LABELS "asset;preflight;viewer;characterization"
+    )
+
+    add_test(
+        NAME asset_fixture_check_missing_root
+        COMMAND asset_fixture_check
+                --root "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/missing-asset-root"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/asset_fixture_check_missing_result.json"
+    )
+    set_tests_properties(asset_fixture_check_missing_root PROPERTIES
+        TIMEOUT 10
+        WILL_FAIL TRUE
+        LABELS "asset;preflight;negative"
     )
 
     add_executable(snapshot_relay_tests
