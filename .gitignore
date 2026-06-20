@@ -1,0 +1,19 @@
+# Build outputs
+/build/
+/out/
+/cmake-build-*/
+
+# Visual Studio / CMake local state
+/.vs/
+CMakeUserPresets.json
+*.suo
+*.user
+*.vcxproj.user
+
+# Generated artifacts and logs
+*.spv
+*.log
+
+# OS metadata
+Thumbs.db
+.DS_Store
