@@ -110,4 +110,4 @@ All build and CTest runs passed. Result files were written for `scene_probe` and
 
 ## Final Commits
 
-Pending branch commit and merge.
+- `0c2807d Add common host CLI result files`
