@@ -1,13 +1,16 @@
 # SP2-003: Golden Governance and Update Workflow v1
 
-Status: planned
+Status: in progress
 Branch: sprint02/sp2-003-golden-governance-update-workflow
-Start commit: TBD by dispatched owner
+Start commit: `f512327`
 Source plan: `docs/sprint-02-implementation-plan.md`
+Source dispatch: `C:\Users\Bartek\Documents\Playground\vulkan-agent-comms\claims\SP2-003.md`
+Required base: `origin/main` `f512327791fd497f7278965dc14d30c4f4792a74`
 Source result docs:
 - `docs/tickets/SP1-010-scenario-runner-goldens_result.md`
 - `docs/tickets/RM1-003-cross-asset-validation_result.md`
-- `docs/tickets/SP2-001-combat-effects-damage-reactions.md`
+- `docs/tickets/SP2-001-combat-effects-damage-reactions_result.md`
+- `docs/tickets/SP2-002-character-definitions-spawn-ownership_result.md`
 
 ## Goal
 
@@ -24,7 +27,8 @@ Make scenario golden trace updates explicit, reviewable, and difficult to perfor
 
 - Golden updates are guarded by `--update-golden` plus `VAC_UPDATE_GOLDENS=1`.
 - Scenario mismatch diagnostics show expected and actual snippets with tick context.
-- Trace schema is about to grow with damage/reaction/effect fields.
+- Trace schema now includes damage/reaction/effect fields from `SP2-001`.
+- Character defaults moved into tracked character definitions in `SP2-002` without golden drift.
 - There is no manifest or documented review checklist for intentional golden drift.
 
 ## Data Flow
@@ -86,6 +90,7 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Planned by `SP2-PLAN`. Implementation not yet dispatched.
+- 2026-06-20: Lara dispatched by Mia for SP2-003 from `origin/main` `f512327`; posted ACK/start evidence with tracked-clean status and untracked `assets/` only.
 
 ## Verification Results
 
