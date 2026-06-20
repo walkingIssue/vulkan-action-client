@@ -1,8 +1,8 @@
 # SP1-008: Primitive Combat Collision v0
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-008-primitive-combat-collision
-Start commit: pending
+Start commit: `95a0d70`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 10.2: Required collision layers
@@ -91,11 +91,21 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-007 combat runtime was merged.
+- 2026-06-20: Added primitive combat volume helpers, root/proxy socket binding, overlap/sweep queries, stable hit ordering, once-per-target filtering, dodge invulnerability boundary coverage, and CTest coverage.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-combat` passed: 5/5 tests.
+- `ctest --preset msvc-debug-unit` passed: 11/11 tests.
+- `ctest --preset msvc-debug-content` passed: 2/2 tests.
+- `ctest --preset msvc-debug-simulation` passed: 1/1 test.
+- `ctest --preset msvc-debug-characterization` passed: 2/2 tests.
+- `ctest --preset msvc-debug` passed: 13/13 tests, including `network_e2e` and `viewer_smoke`.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `54e1699` Add SP1-008 primitive combat collision
