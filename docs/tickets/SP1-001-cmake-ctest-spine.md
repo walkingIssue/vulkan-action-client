@@ -111,4 +111,4 @@ All test runs passed.
 
 ## Final Commits
 
-Pending branch commit and merge.
+- `7f7116d Add CMake and CTest presets`
