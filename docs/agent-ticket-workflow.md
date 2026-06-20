@@ -185,12 +185,32 @@ Use the canonical repository URL:
 git@github.com:walkingIssue/vulkan-action-client.git
 ```
 
+Every checkout should have `origin` pointing at the canonical repository before ticket work begins:
+
+```powershell
+git remote add origin git@github.com:walkingIssue/vulkan-action-client.git
+git fetch --prune origin
+```
+
+If `origin` already exists, verify it and fetch:
+
+```powershell
+git remote -v
+git fetch --prune origin
+```
+
 Push at these points:
 
 - After the start commit is created and the feature branch is created.
 - After any significant chunk of code changes, especially a logical slice that passes targeted tests.
 - After updating verification/result documents near the end of a ticket.
 - After merging a feature branch back to `main`.
+
+Set upstream when first pushing a feature branch:
+
+```powershell
+git push -u origin HEAD
+```
 
 If no `origin` remote is configured, push directly to the canonical URL:
 
@@ -207,6 +227,56 @@ $env:PATH = 'C:\Users\Bartek\Documents\Playground\tools\git-lfs-3.7.1\git-lfs-3.
 ```
 
 Do not read password files or copy secrets into commands unless the user explicitly confirms there is no key-based path. Prefer the configured SSH key and `--no-gpg-sign`.
+
+## Remote Sync Protocol
+
+These rules are required when multiple agents are active:
+
+- Every agent works on its own ticket-scoped feature branch. Do not share a branch unless the handoff is explicit.
+- Fetch before starting, pushing, rebasing, or merging.
+- Rebase only your own private feature branch. Do not rebase `main`, another agent's branch, or a shared handoff branch.
+- Force-push only your own feature branch, and only with `--force-with-lease`. Never use plain `--force`. Never force-push `main`.
+- Main updates are serialized through `merge-log.md`; only one agent should be in the final merge/push phase at a time.
+- If a push to `main` is rejected, fetch and reconcile before retrying.
+
+Before starting or resuming work:
+
+```powershell
+git fetch --prune origin
+git status --short
+```
+
+Before a feature branch is merged:
+
+```powershell
+git switch sprint01/sp1-###-short-slug
+git fetch --prune origin
+git rebase origin/main
+```
+
+After rebasing a previously pushed feature branch:
+
+```powershell
+git push --force-with-lease origin HEAD
+```
+
+Preferred update for local `main`:
+
+```powershell
+git switch main
+git pull --ff-only origin main
+```
+
+Preferred serialized merge sequence:
+
+```powershell
+git fetch --prune origin
+git switch main
+git merge --ff-only origin/main
+git merge --no-gpg-sign --no-ff sprint01/sp1-###-short-slug
+.\tools\test.ps1
+git push origin main
+```
 
 ## Multi-Agent Local Coordination
 
@@ -232,21 +302,27 @@ The directory is intentionally outside this repository so Git operations do not 
 Expected files:
 
 ```text
-status/agent-a.md
-status/agent-b.md
+status/vera.md
+status/lara.md
+status/aetoun.md
+status/mia.md
 claims/README.md
-inbox/agent-a.md
-inbox/agent-b.md
+inbox/vera.md
+inbox/lara.md
+inbox/aetoun.md
+inbox/mia.md
 decisions.md
 merge-log.md
 ```
+
+The active board names are Vera, Lara, Aetoun, and Mia. Use these names in new status entries, claims, direct requests, decisions, and merge-log entries. Legacy `agent-a`, `agent-b`, and `codex*` files are historical only.
 
 Coordination rules:
 
 - At start of work, append branch, checkout path, current task, and likely touched files to your `status/<agent>.md`.
 - Before editing high-conflict files, append a claim with intent, files, response deadline, and default action.
 - Use a 4-minute response window for routine claims. If no response appears, proceed conservatively with the smallest useful change.
-- For direct requests, append to the other agent's inbox and include the same response deadline and default action.
+- For direct requests, append to the other agent's named inbox and include the same response deadline and default action.
 - Record durable cross-ticket decisions in `decisions.md`.
 - Before push or merge, append branch, commit, tests, and watchouts to `merge-log.md`.
 - Keep all notes append-only. Do not rewrite another agent's notes except to add a clearly marked response.
@@ -354,13 +430,21 @@ Before merging:
 1. Update the ticket document with verification results.
 2. Run required tests.
 3. Ensure `git status --short` only shows intended changes.
-4. Merge back to main.
+4. Fetch and rebase the feature branch on `origin/main`.
+5. Claim the final merge in `merge-log.md`.
+6. Merge back to main.
 
 Preferred merge when the branch is ready:
 
 ```powershell
+git switch sprint01/sp1-###-short-slug
+git fetch --prune origin
+git rebase origin/main
 git switch main
+git merge --ff-only origin/main
 git merge --no-gpg-sign --no-ff sprint01/sp1-###-short-slug
+.\tools\test.ps1
+git push origin main
 ```
 
 If the project later prefers fast-forward-only history, update this workflow. Until then, a merge commit keeps ticket boundaries visible.
