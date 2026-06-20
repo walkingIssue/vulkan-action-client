@@ -1,8 +1,8 @@
 # SP1-009: Proxy Animation, Keyframes, and Interpolation
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-009-proxy-animation-keyframes
-Start commit: pending
+Start commit: `08277f5`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 13.6: Hit and hurt model
@@ -89,11 +89,18 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-008 primitive combat collision was merged.
+- 2026-06-20: Added `animation_core`, proxy animation schema/loading/canonicalization, root/socket keyframe sampling, interpolation, root-motion deltas, socket world transforms, fixture, and CTest coverage.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-combat` passed: 6/6 tests.
+- `ctest --preset msvc-debug-unit` passed: 12/12 tests.
+- `ctest --preset msvc-debug` passed: 14/14 tests, including `network_e2e` and `viewer_smoke`.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `a45d395` Add SP1-009 proxy animation sampling
