@@ -1,8 +1,8 @@
 # SP1-003: Characterization Before Extraction
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-003-characterization
-Start commit: this ticket-start commit on `main`
+Start commit: `63c66bf`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 2: Current Baseline
@@ -105,11 +105,18 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-001 and SP1-002 were merged.
+- 2026-06-20: Added fixture-backed characterization coverage for bootstrap scene semantics, movement/interpolation traces, protocol packet bytes, relay late-join/disconnect behavior, and viewer smoke under CTest.
 
 ## Verification Results
 
-Pending.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-unit` passed: 6/6 tests.
+- `ctest --preset msvc-debug-characterization` passed: 2/2 tests, including `characterization_tests` and `viewer_smoke`.
+- `ctest --preset msvc-debug-viewer` passed: 1/1 test.
+- `ctest --preset msvc-debug` passed: 8/8 tests, including `network_e2e` and `viewer_smoke`.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `71ab398` Add SP1-003 characterization coverage
