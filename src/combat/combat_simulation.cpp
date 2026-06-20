@@ -80,17 +80,23 @@ bool applyCharacterLocomotion(ActorState &actor,
     return true;
 }
 
-bool applyCameraLockedLocomotion(ActorState &actor,
-                                 LocalMoveIntent intent,
-                                 ControlFrame cameraFrame,
-                                 float deltaSeconds,
-                                 ArenaLimits arena)
+bool applyCameraRelativeLocomotion(ActorState &actor,
+                                   LocalMoveIntent intent,
+                                   ControlFrame cameraFrame,
+                                   bool lockFacingToCamera,
+                                   float deltaSeconds,
+                                   ArenaLimits arena)
 {
     Transform &transform = actor.currentTransform;
-    const bool rotated = std::abs(transform.rotationDegrees.y - cameraFrame.yawDegrees) > 0.001f;
-    transform.rotationDegrees.y = cameraFrame.yawDegrees;
-
     const glm::vec2 axes = normalizedDirection(intent.axes);
+    const bool wantsBackpedal = axes.y < -0.0001f;
+    bool rotated = false;
+
+    if (lockFacingToCamera || wantsBackpedal) {
+        rotated = std::abs(transform.rotationDegrees.y - cameraFrame.yawDegrees) > 0.001f;
+        transform.rotationDegrees.y = cameraFrame.yawDegrees;
+    }
+
     if (glm::dot(axes, axes) <= 0.0001f) {
         return rotated;
     }
@@ -98,9 +104,10 @@ bool applyCameraLockedLocomotion(ActorState &actor,
     const glm::vec2 direction = normalizedDirection(
         rightFromYaw(cameraFrame.yawDegrees) * axes.x +
         forwardFromYaw(cameraFrame.yawDegrees) * axes.y);
+    const float speedScale = wantsBackpedal ? kBackpedalSpeedScale : 1.0f;
 
-    transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
-    transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
+    transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * speedScale * deltaSeconds;
+    transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * speedScale * deltaSeconds;
     clampToArena(transform, arena);
     return true;
 }

@@ -19,7 +19,7 @@ DirectInput exists and is COM-based, but it is legacy for most modern game use. 
 
 For the first controller path, use XInput. It is narrow, stable, and enough for Xbox-compatible pads while we are still building the combat input model.
 
-The current scene viewer has the first thin version of this: XInput left stick and `WASD` drive camera-relative player strafing, while mouse controls the player-follow camera and facing. This is prototype plumbing, not the final combat input API.
+The current scene viewer has the first thin version of this: XInput left stick and `WASD` drive camera-relative player strafing, mouse controls the player-follow camera, and right mouse button locks player facing to the camera. This is prototype plumbing, not the final combat input API.
 
 ## Desired Engine Shape
 
@@ -53,7 +53,7 @@ struct CombatInput {
 
 That gives us clean edge detection, buffering windows, cancel checks, replay, rollback, and debugging. Rendering can run faster or slower without changing whether a dodge or attack happened.
 
-Movement axes should start local, not global. `WASD` and stick input describe side and forward intent. The control scheme chooses a frame, such as camera yaw for strafing, character facing for committed action movement, or a lock-on target frame for duels.
+Movement axes should start local, not global. `WASD` and stick input describe side and forward intent. The control scheme chooses a frame, such as camera yaw for strafing, character facing for committed action movement, or a lock-on target frame for duels. Prototype backpedal is a combat rule: negative forward intent snaps facing to the camera frame and moves at one-third forward speed.
 
 ## Practical First Step
 

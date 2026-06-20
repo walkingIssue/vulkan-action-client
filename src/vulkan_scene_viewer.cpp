@@ -395,6 +395,7 @@ private:
         m_fixedAccumulatorSeconds += std::min(deltaSeconds, 0.25f);
 
         const vac::combat::LocalMoveIntent playerIntent = readPlayerMoveAxes();
+        const bool lockPlayerFacingToCamera = shouldLockPlayerFacingToCamera();
         float sparringYawDegrees = 0.0f;
         if (m_sparringIndex.has_value()) {
             sparringYawDegrees = m_actorStates[*m_sparringIndex].currentTransform.rotationDegrees.y;
@@ -412,11 +413,12 @@ private:
             }
 
             if (m_playerIndex.has_value()) {
-                moved |= vac::combat::applyCameraLockedLocomotion(m_actorStates[*m_playerIndex],
-                                                                  playerIntent,
-                                                                  {m_cameraYawDegrees},
-                                                                  vac::combat::kFixedTickSeconds,
-                                                                  arena);
+                moved |= vac::combat::applyCameraRelativeLocomotion(m_actorStates[*m_playerIndex],
+                                                                    playerIntent,
+                                                                    {m_cameraYawDegrees},
+                                                                    lockPlayerFacingToCamera,
+                                                                    vac::combat::kFixedTickSeconds,
+                                                                    arena);
             }
 
             if (m_sparringIndex.has_value()) {
@@ -475,6 +477,11 @@ private:
         }
 
         return vac::combat::interpolate(m_actorStates[actorIndex], m_presentationAlpha);
+    }
+
+    bool shouldLockPlayerFacingToCamera() const
+    {
+        return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
     }
 
     vac::combat::LocalMoveIntent readPlayerMoveAxes() const

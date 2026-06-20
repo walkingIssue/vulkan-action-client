@@ -9,6 +9,7 @@ namespace vac::combat
 inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
 inline constexpr int kMaxCatchUpTicksPerFrame = 5;
 inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
+inline constexpr float kBackpedalSpeedScale = 1.0f / 3.0f;
 inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;
 inline constexpr float kTurnSpeedDegreesPerSecond = 240.0f;
 inline constexpr float kArenaEdgeInsetWorldUnits = 5.0f;
@@ -42,10 +43,11 @@ bool applyCharacterLocomotion(ActorState &actor,
                               ControlFrame idleControlFrame,
                               float deltaSeconds,
                               ArenaLimits arena);
-bool applyCameraLockedLocomotion(ActorState &actor,
-                                 LocalMoveIntent intent,
-                                 ControlFrame cameraFrame,
-                                 float deltaSeconds,
-                                 ArenaLimits arena);
+bool applyCameraRelativeLocomotion(ActorState &actor,
+                                   LocalMoveIntent intent,
+                                   ControlFrame cameraFrame,
+                                   bool lockFacingToCamera,
+                                   float deltaSeconds,
+                                   ArenaLimits arena);
 Transform interpolate(const ActorState &actor, float alpha);
 } // namespace vac::combat
