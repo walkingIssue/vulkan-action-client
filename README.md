@@ -80,8 +80,21 @@ Movement currently runs through a small fixed-tick combat simulation layer, whil
 
 Movement tuning and key bindings live in `config/controls/player_control_profile.json`. The viewer hot-reloads that profile while running, so run speed, sprint scale, backpedal scale, arrival radius, arena inset, and keyboard bindings can be tuned without rebuilding.
 
+## UDP Relay Prototype
+
+Run the relay server and two optimistic clients:
+
+```powershell
+.\build\msvc-debug\udp_state_server.exe --bind 127.0.0.1:40000
+.\build\msvc-debug\vulkan_scene_viewer.exe --net-client-id 1 --net-server 127.0.0.1:40000
+.\build\msvc-debug\vulkan_scene_viewer.exe --net-client-id 2 --net-server 127.0.0.1:40000
+```
+
+The server only validates and fans out bitpacked actor snapshots. Client `1` owns the first character and client `2` owns the second character.
+
 ## Architecture Notes
 
 See `docs/simulation-presentation-split.md` for the intended split between authoritative gameplay simulation and visual presentation.
 See `docs/input-pipeline.md` for the intended path from platform input to fixed-tick combat commands.
 See `docs/control-profile.md` for hot-reloaded movement tuning and key binding data.
+See `docs/network-architecture.md` for the current UDP relay protocol and client/server split.

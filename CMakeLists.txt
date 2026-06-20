@@ -35,6 +35,28 @@ target_link_libraries(scene_core PUBLIC
     spdlog::spdlog
 )
 
+add_library(network_core
+    src/network/snapshot_client.cpp
+    src/network/state_protocol.cpp
+    src/network/udp_socket.cpp
+)
+
+target_compile_features(network_core PUBLIC cxx_std_20)
+
+target_include_directories(network_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(network_core PUBLIC
+    fmt::fmt
+    glm::glm
+    spdlog::spdlog
+)
+
+if(WIN32)
+    target_link_libraries(network_core PUBLIC Ws2_32)
+endif()
+
 function(add_shader TARGET_NAME SOURCE_FILE)
     set(OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/shaders/${TARGET_NAME}.spv")
     add_custom_command(
@@ -88,6 +110,16 @@ target_link_libraries(scene_probe PRIVATE
     scene_core
 )
 
+add_executable(udp_state_server
+    src/udp_state_server.cpp
+)
+
+target_compile_features(udp_state_server PRIVATE cxx_std_20)
+
+target_link_libraries(udp_state_server PRIVATE
+    network_core
+)
+
 add_executable(vulkan_scene_viewer
     src/vulkan_scene_viewer.cpp
 )
@@ -107,6 +139,7 @@ target_compile_definitions(vulkan_scene_viewer PRIVATE
 
 target_link_libraries(vulkan_scene_viewer PRIVATE
     scene_core
+    network_core
     Vulkan::Vulkan
     fmt::fmt
     glfw

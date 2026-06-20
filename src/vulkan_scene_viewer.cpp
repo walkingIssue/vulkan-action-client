@@ -5,6 +5,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <WinSock2.h>
 #include <Windows.h>
 #include <Xinput.h>
 #endif
@@ -24,6 +25,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -39,6 +41,7 @@
 
 #include "combat/combat_simulation.hpp"
 #include "config/control_profile.hpp"
+#include "network/snapshot_client.hpp"
 #include "render/scene_geometry.hpp"
 #include "scene/scene_runtime.hpp"
 
@@ -62,6 +65,8 @@ struct ViewerOptions
 {
     std::filesystem::path scenePath;
     std::filesystem::path controlProfilePath;
+    std::string networkServer = "127.0.0.1:40000";
+    uint8_t networkClientId = 0;
     uint32_t frames = 0;
     bool orbitCamera = false;
 };
@@ -158,6 +163,14 @@ ViewerOptions parseOptions(int argc, char **argv)
             options.scenePath = argv[++i];
         } else if (arg == "--control-profile" && i + 1 < argc) {
             options.controlProfilePath = argv[++i];
+        } else if (arg == "--net-server" && i + 1 < argc) {
+            options.networkServer = argv[++i];
+        } else if (arg == "--net-client-id" && i + 1 < argc) {
+            const int clientId = std::stoi(argv[++i]);
+            if (clientId < 0 || clientId > 255) {
+                throw std::runtime_error("--net-client-id must be between 0 and 255");
+            }
+            options.networkClientId = static_cast<uint8_t>(clientId);
         } else if (arg == "--frames" && i + 1 < argc) {
             options.frames = static_cast<uint32_t>(std::max(0, std::stoi(argv[++i])));
         } else if (arg == "--orbit-camera") {
@@ -296,8 +309,10 @@ public:
         m_renderData = vac::buildSceneRenderData(m_scene);
         m_lineData = vac::buildSceneLineData(m_scene);
         findControllableActors();
+        configureNetworkActors();
         initializeCombatActors();
         initializeCameraAnchor();
+        initializeNetworkClient();
     }
 
     ~VulkanSceneViewer()
@@ -322,6 +337,10 @@ private:
     vac::SceneRenderData m_renderData;
     vac::SceneDrawData m_lineData;
     std::vector<vac::combat::ActorState> m_actorStates;
+    std::unique_ptr<vac::net::SnapshotClient> m_networkClient;
+    std::unordered_map<uint8_t, size_t> m_networkActorByClientId;
+    uint16_t m_networkTick = 0;
+    bool m_networkTransformApplied = false;
 
     GLFWwindow *m_window = nullptr;
     VkInstance m_instance = VK_NULL_HANDLE;
@@ -487,6 +506,7 @@ private:
         while (!glfwWindowShouldClose(m_window)) {
             glfwPollEvents();
             maybeReloadControlProfile();
+            pumpNetworkSnapshots();
             handleCameraModeToggle();
             updateGroundCursor();
             handleClickToMoveInput();
@@ -522,6 +542,94 @@ private:
                 m_sparringIndex = i;
             }
         }
+    }
+
+    void configureNetworkActors()
+    {
+        if (m_playerIndex.has_value()) {
+            m_networkActorByClientId[1] = *m_playerIndex;
+        }
+        if (m_sparringIndex.has_value()) {
+            m_networkActorByClientId[2] = *m_sparringIndex;
+        }
+
+        if (m_options.networkClientId == 0) {
+            return;
+        }
+
+        const auto localActor = m_networkActorByClientId.find(m_options.networkClientId);
+        if (localActor == m_networkActorByClientId.end()) {
+            throw std::runtime_error(fmt::format("No actor mapping for network client {}", m_options.networkClientId));
+        }
+
+        m_playerIndex = localActor->second;
+    }
+
+    void initializeNetworkClient()
+    {
+        if (m_options.networkClientId == 0) {
+            return;
+        }
+
+        m_networkClient = std::make_unique<vac::net::SnapshotClient>(
+            m_options.networkClientId,
+            vac::net::resolveEndpoint(m_options.networkServer));
+        spdlog::info("Network client {} sending snapshots to {}",
+                     m_options.networkClientId,
+                     m_options.networkServer);
+    }
+
+    void pumpNetworkSnapshots()
+    {
+        if (!m_networkClient) {
+            return;
+        }
+
+        bool applied = false;
+        for (const vac::net::ActorSnapshot &snapshot : m_networkClient->receiveSnapshots()) {
+            const auto actorIt = m_networkActorByClientId.find(snapshot.clientId);
+            if (actorIt == m_networkActorByClientId.end() || actorIt->second >= m_actorStates.size()) {
+                continue;
+            }
+
+            vac::combat::ActorState &actor = m_actorStates[actorIt->second];
+            actor.previousTransform = actor.currentTransform;
+            actor.currentTransform.translation = snapshot.position;
+            actor.currentTransform.rotationDegrees.y = snapshot.yawDegrees;
+            applied = true;
+        }
+
+        if (applied) {
+            m_networkTransformApplied = true;
+            syncSceneToCombatCurrent();
+        }
+    }
+
+    void sendLocalNetworkSnapshot(bool sprinting, bool moving)
+    {
+        if (!m_networkClient || !m_playerIndex.has_value()) {
+            return;
+        }
+
+        const vac::Transform &transform = m_actorStates[*m_playerIndex].currentTransform;
+        uint8_t flags = 0;
+        if (m_cameraSteeringEnabled) {
+            flags |= vac::net::snapshotCameraSteering;
+        }
+        if (sprinting) {
+            flags |= vac::net::snapshotSprinting;
+        }
+        if (moving) {
+            flags |= vac::net::snapshotMoving;
+        }
+
+        m_networkClient->sendSnapshot({
+            m_options.networkClientId,
+            m_networkTick++,
+            flags,
+            transform.translation,
+            transform.rotationDegrees.y,
+        });
     }
 
     void initializeCombatActors()
@@ -767,9 +875,10 @@ private:
                                                                       arena,
                                                                       m_controlProfile.movement);
                 }
+                sendLocalNetworkSnapshot(playerSprinting, hasPlayerMoveInput || m_playerMoveTarget.has_value());
             }
 
-            if (m_sparringIndex.has_value()) {
+            if (m_sparringIndex.has_value() && !m_networkClient) {
                 m_actorStates[*m_sparringIndex].moveSpeedWorldUnitsPerSecond =
                     m_controlProfile.movement.sparringMoveSpeedWorldUnitsPerSecond;
                 moved |= vac::combat::applyCharacterLocomotion(m_actorStates[*m_sparringIndex],
@@ -790,6 +899,9 @@ private:
         }
 
         m_presentationAlpha = std::clamp(m_fixedAccumulatorSeconds / vac::combat::kFixedTickSeconds, 0.0f, 1.0f);
+
+        moved = moved || m_networkTransformApplied;
+        m_networkTransformApplied = false;
 
         if (ticks > 0 && moved) {
             syncSceneToCombatCurrent();
@@ -942,8 +1054,12 @@ private:
             playerPosition = presentationTransform(*m_playerIndex).translation;
         }
 
-        const std::string title = fmt::format("Vulkan Action Client - {:.0f} FPS | mode={} | player x={:.1f} z={:.1f}",
+        const std::string networkLabel = m_networkClient
+            ? fmt::format("net{}", m_options.networkClientId)
+            : "local";
+        const std::string title = fmt::format("Vulkan Action Client - {:.0f} FPS | {} | mode={} | player x={:.1f} z={:.1f}",
                                              fps,
+                                             networkLabel,
                                              m_cameraSteeringEnabled ? "camera" : "cursor",
                                              playerPosition.x,
                                              playerPosition.z);
