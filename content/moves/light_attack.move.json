@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "assetGuid": "move-guid-light-attack",
+  "logicalId": "move.light_attack",
+  "durationTicks": 34,
+  "tags": ["startup", "active", "recovery", "attack", "light", "weapon", "vulnerable", "chain"],
+  "knownMoves": ["move.light_attack", "move.light_followup", "move.dodge"],
+  "input": {
+    "command": "light_attack",
+    "bufferTicks": 8
+  },
+  "phases": [
+    {"id": "startup", "beginTick": 0, "endTick": 9, "tags": ["startup"]},
+    {"id": "active", "beginTick": 9, "endTick": 13, "tags": ["active", "attack"]},
+    {"id": "recovery", "beginTick": 13, "endTick": 34, "tags": ["recovery"]}
+  ],
+  "movementTracks": [
+    {
+      "id": "root_lunge",
+      "beginTick": 4,
+      "endTick": 10,
+      "translation": [0.0, 0.0, 1.25],
+      "tags": ["attack"]
+    }
+  ],
+  "hitboxTracks": [
+    {
+      "id": "blade_arc",
+      "beginTick": 9,
+      "endTick": 13,
+      "shape": "box",
+      "socket": "weapon_tip",
+      "size": [0.6, 0.45, 1.4],
+      "offset": [0.0, 1.1, 0.4],
+      "tags": ["weapon", "light"]
+    }
+  ],
+  "hurtboxOverrides": [
+    {
+      "id": "upper_body_open",
+      "beginTick": 8,
+      "endTick": 18,
+      "profile": "counterable",
+      "tags": ["vulnerable"]
+    }
+  ],
+  "cancels": [
+    {
+      "id": "chain_on_hit",
+      "beginTick": 12,
+      "endTick": 20,
+      "condition": "on_hit",
+      "destinations": ["move.light_followup"],
+      "tags": ["chain"]
+    },
+    {
+      "id": "dodge_recovery",
+      "beginTick": 18,
+      "endTick": 34,
+      "condition": "always",
+      "destinations": ["move.dodge"],
+      "tags": ["recovery"]
+    }
+  ],
+  "resources": {
+    "staminaCost": 10.0
+  },
+  "events": [
+    {"id": "swing_start", "tick": 4, "type": "animation_event", "payload": "sword_swing_start", "tags": ["startup"]},
+    {"id": "hitbox_on", "tick": 9, "type": "debug_event", "payload": "blade_arc_on", "tags": ["active"]}
+  ]
+}

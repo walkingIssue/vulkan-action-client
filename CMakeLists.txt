@@ -16,6 +16,7 @@ find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 
 add_library(content_core
     src/content/authoring_scene.cpp
+    src/content/move_asset.cpp
 )
 
 target_compile_features(content_core PUBLIC cxx_std_20)
@@ -236,6 +237,22 @@ if(BUILD_TESTING)
     set_tests_properties(authoring_scene_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;content;authoring;map"
+    )
+
+    add_executable(move_asset_tests
+        tests/move_asset_tests.cpp
+    )
+
+    target_compile_features(move_asset_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(move_asset_tests PRIVATE
+        content_core
+    )
+
+    add_test(NAME move_asset_tests COMMAND move_asset_tests)
+    set_tests_properties(move_asset_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;content;combat;move"
     )
 
     add_executable(simulation_runtime_tests
