@@ -19,9 +19,17 @@ glm::vec2 normalizedDirection(glm::vec2 direction)
     return direction;
 }
 
-float lerp(float a, float b, float alpha)
+glm::vec2 forwardFromYaw(float yawDegrees)
 {
-    return a + (b - a) * alpha;
+    const float yawRadians = glm::radians(yawDegrees);
+    return {std::sin(yawRadians), std::cos(yawRadians)};
+}
+
+void clampToArena(Transform &transform, ArenaLimits arena)
+{
+    const glm::vec2 allowed = glm::max(arena.halfExtents - glm::vec2{arena.edgeInset}, glm::vec2{0.0f});
+    transform.translation.x = std::clamp(transform.translation.x, -allowed.x, allowed.x);
+    transform.translation.z = std::clamp(transform.translation.z, -allowed.y, allowed.y);
 }
 } // namespace
 
@@ -30,37 +38,39 @@ void beginTick(ActorState &actor)
     actor.previousTransform = actor.currentTransform;
 }
 
-MoveIntent toWorldMoveIntent(LocalMoveIntent intent, ControlFrame frame)
+bool applyCharacterLocomotion(ActorState &actor,
+                              LocalMoveIntent intent,
+                              ControlFrame idleControlFrame,
+                              float deltaSeconds,
+                              ArenaLimits arena)
 {
     const glm::vec2 axes = normalizedDirection(intent.axes);
-    if (glm::dot(axes, axes) <= 0.0001f) {
-        return {};
-    }
+    const float turnAxis = axes.x;
+    const float forwardAxis = axes.y;
+    const bool wantsForwardMotion = std::abs(forwardAxis) > 0.0001f;
+    const bool wantsSideStart = !wantsForwardMotion && std::abs(turnAxis) > 0.0001f;
 
-    const float yawRadians = glm::radians(frame.yawDegrees);
-    const glm::vec2 right{std::cos(yawRadians), -std::sin(yawRadians)};
-    const glm::vec2 forward{std::sin(yawRadians), std::cos(yawRadians)};
-    return {normalizedDirection(right * axes.x + forward * axes.y)};
-}
-
-bool applyMoveIntent(ActorState &actor,
-                     MoveIntent intent,
-                     float deltaSeconds,
-                     ArenaLimits arena)
-{
-    const glm::vec2 direction = normalizedDirection(intent.worldDirection);
-    if (glm::dot(direction, direction) <= 0.0001f) {
+    if (!wantsForwardMotion && !wantsSideStart) {
         return false;
     }
 
     Transform &transform = actor.currentTransform;
-    transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
-    transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
-    transform.rotationDegrees.y = glm::degrees(std::atan2(direction.x, direction.y));
 
-    const glm::vec2 allowed = glm::max(arena.halfExtents - glm::vec2{arena.edgeInset}, glm::vec2{0.0f});
-    transform.translation.x = std::clamp(transform.translation.x, -allowed.x, allowed.x);
-    transform.translation.z = std::clamp(transform.translation.z, -allowed.y, allowed.y);
+    if (wantsForwardMotion) {
+        transform.rotationDegrees.y -= turnAxis * kTurnSpeedDegreesPerSecond * deltaSeconds;
+
+        const glm::vec2 direction = forwardFromYaw(transform.rotationDegrees.y) * forwardAxis;
+        transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
+        transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
+    } else {
+        transform.rotationDegrees.y = idleControlFrame.yawDegrees - turnAxis * 90.0f;
+
+        const glm::vec2 direction = forwardFromYaw(transform.rotationDegrees.y);
+        transform.translation.x += direction.x * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
+        transform.translation.z += direction.y * actor.moveSpeedWorldUnitsPerSecond * deltaSeconds;
+    }
+
+    clampToArena(transform, arena);
     return true;
 }
 

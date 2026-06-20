@@ -73,7 +73,7 @@ Prototype controls:
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Player movement is camera-relative; sparring movement is character-relative.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. W/S advance along the character facing; A/D steer while advancing, or start a side move from idle relative to the camera.
 
 ## Architecture Notes
 

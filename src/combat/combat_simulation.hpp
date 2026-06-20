@@ -10,6 +10,7 @@ inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
 inline constexpr int kMaxCatchUpTicksPerFrame = 5;
 inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
 inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;
+inline constexpr float kTurnSpeedDegreesPerSecond = 240.0f;
 inline constexpr float kArenaEdgeInsetWorldUnits = 5.0f;
 
 struct LocalMoveIntent
@@ -20,11 +21,6 @@ struct LocalMoveIntent
 struct ControlFrame
 {
     float yawDegrees = 0.0f;
-};
-
-struct MoveIntent
-{
-    glm::vec2 worldDirection{0.0f};
 };
 
 struct ArenaLimits
@@ -41,10 +37,10 @@ struct ActorState
 };
 
 void beginTick(ActorState &actor);
-MoveIntent toWorldMoveIntent(LocalMoveIntent intent, ControlFrame frame);
-bool applyMoveIntent(ActorState &actor,
-                     MoveIntent intent,
-                     float deltaSeconds,
-                     ArenaLimits arena);
+bool applyCharacterLocomotion(ActorState &actor,
+                              LocalMoveIntent intent,
+                              ControlFrame idleControlFrame,
+                              float deltaSeconds,
+                              ArenaLimits arena);
 Transform interpolate(const ActorState &actor, float alpha);
 } // namespace vac::combat

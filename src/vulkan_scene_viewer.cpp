@@ -384,7 +384,7 @@ private:
         m_lastMouseY = y;
 
         constexpr float sensitivity = 0.12f;
-        m_cameraYawDegrees += static_cast<float>(dx) * sensitivity;
+        m_cameraYawDegrees -= static_cast<float>(dx) * sensitivity;
         m_cameraPitchDegrees = std::clamp(m_cameraPitchDegrees - static_cast<float>(dy) * sensitivity,
                                           8.0f,
                                           58.0f);
@@ -394,17 +394,13 @@ private:
     {
         m_fixedAccumulatorSeconds += std::min(deltaSeconds, 0.25f);
 
-        const vac::combat::MoveIntent playerIntent = vac::combat::toWorldMoveIntent(
-            readPlayerMoveAxes(),
-            {m_cameraYawDegrees});
-
+        const vac::combat::LocalMoveIntent playerIntent = readPlayerMoveAxes();
         float sparringYawDegrees = 0.0f;
         if (m_sparringIndex.has_value()) {
             sparringYawDegrees = m_actorStates[*m_sparringIndex].currentTransform.rotationDegrees.y;
         }
-        const vac::combat::MoveIntent sparringIntent = vac::combat::toWorldMoveIntent(
-            readKeyboardAxes(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN),
-            {sparringYawDegrees});
+        const vac::combat::LocalMoveIntent sparringIntent =
+            readKeyboardAxes(GLFW_KEY_LEFT, GLFW_KEY_RIGHT, GLFW_KEY_UP, GLFW_KEY_DOWN);
         const vac::combat::ArenaLimits arena = arenaLimits();
 
         int ticks = 0;
@@ -416,17 +412,19 @@ private:
             }
 
             if (m_playerIndex.has_value()) {
-                moved |= vac::combat::applyMoveIntent(m_actorStates[*m_playerIndex],
-                                                      playerIntent,
-                                                      vac::combat::kFixedTickSeconds,
-                                                      arena);
+                moved |= vac::combat::applyCharacterLocomotion(m_actorStates[*m_playerIndex],
+                                                               playerIntent,
+                                                               {m_cameraYawDegrees},
+                                                               vac::combat::kFixedTickSeconds,
+                                                               arena);
             }
 
             if (m_sparringIndex.has_value()) {
-                moved |= vac::combat::applyMoveIntent(m_actorStates[*m_sparringIndex],
-                                                      sparringIntent,
-                                                      vac::combat::kFixedTickSeconds,
-                                                      arena);
+                moved |= vac::combat::applyCharacterLocomotion(m_actorStates[*m_sparringIndex],
+                                                               sparringIntent,
+                                                               {sparringYawDegrees},
+                                                               vac::combat::kFixedTickSeconds,
+                                                               arena);
             }
 
             m_fixedAccumulatorSeconds -= vac::combat::kFixedTickSeconds;
