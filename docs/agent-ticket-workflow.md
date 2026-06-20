@@ -198,6 +198,27 @@ ctest --preset msvc-debug
 
 Until presets exist, use the current repo scripts as a bridge, but ticket acceptance should move toward CMake/CTest.
 
+## MSVC Runtime Dialogs
+
+On Windows, MSVC debug-runtime failures can appear as desktop dialogs while the shell only shows a timeout, abort, or empty output. Agents must treat this as an inspectable failure mode, not as a mysterious hung test.
+
+Before declaring a native test hung, check for visible runtime/assertion windows:
+
+```powershell
+Get-Process | Where-Object {
+    $_.MainWindowTitle -match 'Debug Assertion Failed|Microsoft Visual C\+\+ Runtime Library|abort\(\)'
+} | Select-Object Id,ProcessName,MainWindowTitle
+```
+
+If such a window exists:
+
+- Record the process name and window title in the ticket/result notes.
+- Prefer fixing the test or executable so failures print to stderr and exit nonzero.
+- For test binaries that intentionally exercise failure paths, suppress MSVC report dialogs inside the test harness and route assertions to terminal output.
+- Do not keep waiting on the process without inspecting the dialog state.
+
+A future local Codex plugin may wrap this check, but the repository workflow should not depend on the plugin. CTest/result files remain the durable automation path.
+
 ## Data Flow Requirement
 
 Every ticket must include a data flow section because this project is easy to accidentally couple:
