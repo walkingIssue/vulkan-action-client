@@ -53,7 +53,7 @@ struct CombatInput {
 
 That gives us clean edge detection, buffering windows, cancel checks, replay, rollback, and debugging. Rendering can run faster or slower without changing whether a dodge or attack happened.
 
-Movement axes should start local, not global. `WASD` and stick input describe side and forward intent. The control scheme chooses a frame, such as camera yaw for strafing, character facing for committed action movement, a clicked world target, or a lock-on target frame for duels. Axes are normalized before the combat tick consumes them, so diagonal input does not exceed straight-line speed. Prototype backpedal is a combat rule: negative forward intent moves at one-third forward speed in the active movement frame.
+Movement axes should start local, not global. `WASD` and stick input describe side and forward intent. The control scheme chooses a frame, such as camera yaw for strafing, character facing for committed action movement, a clicked world target, or a lock-on target frame for duels. Axes are normalized before the combat tick consumes them, so diagonal input does not exceed straight-line speed. Shift is a sprint modifier that scales the player's authored movement speed by 1.6. Prototype backpedal is a combat rule: negative forward intent moves at one-third of the active run or sprint speed in the active movement frame.
 
 ## Practical First Step
 

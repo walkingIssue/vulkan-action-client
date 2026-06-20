@@ -8,7 +8,8 @@ namespace vac::combat
 {
 inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;
 inline constexpr int kMaxCatchUpTicksPerFrame = 5;
-inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
+inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 29.0f;
+inline constexpr float kPlayerSprintSpeedScale = 1.6f;
 inline constexpr float kBackpedalSpeedScale = 1.0f / 3.0f;
 inline constexpr float kMoveTargetArrivalRadiusWorldUnits = 1.0f;
 inline constexpr float kSparringMoveSpeedWorldUnitsPerSecond = 50.0f;

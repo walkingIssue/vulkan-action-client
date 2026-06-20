@@ -552,6 +552,7 @@ private:
 
         const vac::combat::LocalMoveIntent playerIntent = readPlayerMoveAxes();
         const bool lockPlayerFacingToCamera = shouldLockPlayerFacingToCamera();
+        const bool playerSprinting = isPlayerSprintPressed();
         const bool hasPlayerMoveInput = glm::dot(playerIntent.axes, playerIntent.axes) > 0.0001f;
         if (hasPlayerMoveInput && m_playerMoveTarget.has_value()) {
             m_playerMoveTarget.reset();
@@ -575,6 +576,9 @@ private:
 
             if (m_playerIndex.has_value()) {
                 vac::combat::ActorState &player = m_actorStates[*m_playerIndex];
+                player.moveSpeedWorldUnitsPerSecond =
+                    vac::combat::kPlayerMoveSpeedWorldUnitsPerSecond *
+                    (playerSprinting ? vac::combat::kPlayerSprintSpeedScale : 1.0f);
                 if (!lockPlayerFacingToCamera && !hasPlayerMoveInput && m_playerMoveTarget.has_value()) {
                     moved |= vac::combat::applyMoveToWorldTarget(player,
                                                                  *m_playerMoveTarget,
@@ -661,6 +665,12 @@ private:
     bool shouldLockPlayerFacingToCamera() const
     {
         return m_cameraSteeringEnabled;
+    }
+
+    bool isPlayerSprintPressed() const
+    {
+        return glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+               glfwGetKey(m_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
     }
 
     static bool isAtMoveTarget(const vac::combat::ActorState &actor, glm::vec2 target)

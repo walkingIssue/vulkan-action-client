@@ -57,7 +57,8 @@ The intent should carry an explicit frame conversion. Raw controls are local axe
 For now the prototype uses world units per second:
 
 ```cpp
-inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 58.0f;
+inline constexpr float kPlayerMoveSpeedWorldUnitsPerSecond = 29.0f;
+inline constexpr float kPlayerSprintSpeedScale = 1.6f;
 inline constexpr float kBackpedalSpeedScale = 1.0f / 3.0f;
 inline constexpr float kMoveTargetArrivalRadiusWorldUnits = 1.0f;
 inline constexpr float kFixedTickSeconds = 1.0f / 60.0f;

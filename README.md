@@ -72,10 +72,11 @@ Prototype controls:
 - Tab or Caps Lock toggles between cursor mode and camera steering mode.
 - In cursor mode, the mouse pointer is visible. Left click the projected ground square to rotate the player toward that point and move there.
 - In camera steering mode, mouse movement rotates the player-follow camera and player movement/facing locks to the camera direction.
+- Hold Shift to sprint at 1.6x normal movement speed.
 - Arrow keys move the sparring partner.
 - Escape closes the viewer.
 
-Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Cursor mode uses character-facing movement and click-to-move world targets. Camera steering mode uses camera-relative movement and facing. Diagonal movement input is normalized so `A+W` and `D+W` do not move faster than straight movement. Backpedal moves at one-third forward speed.
+Movement currently runs through a small fixed-tick combat simulation layer, while presentation interpolates combat transforms and renders cached model geometry. Cursor mode uses character-facing movement and click-to-move world targets. Camera steering mode uses camera-relative movement and facing. Diagonal movement input is normalized so `A+W` and `D+W` do not move faster than straight movement. Backpedal moves at one-third of the active run/sprint speed.
 
 ## Architecture Notes
 
