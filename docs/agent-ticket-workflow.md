@@ -276,6 +276,34 @@ ctest --preset msvc-debug
 
 Until presets exist, use the current repo scripts as a bridge, but ticket acceptance should move toward CMake/CTest.
 
+## Visual Inspection Capture
+
+Native Vulkan windows are not directly inspectable by agents. When a task needs visual confirmation of the current viewer output, produce an image artifact first:
+
+```powershell
+.\tools\capture-scene-viewer.ps1
+```
+
+Default artifacts:
+
+```text
+build/msvc-debug/artifacts/scene-viewer-capture.png
+build/msvc-debug/artifacts/scene-viewer-capture.json
+build/msvc-debug/artifacts/scene-viewer-capture.viewer.json
+```
+
+Use the PNG for agent image inspection and mention the artifact path in handoffs or result notes. Keep the viewer window unobstructed during capture because the helper grabs visible window pixels. Treat this as manual/visual evidence only; gameplay correctness still belongs in headless tests, structured result files, fixtures, traces, and hashes.
+
+Useful options:
+
+```powershell
+.\tools\capture-scene-viewer.ps1 -Output build/msvc-debug/artifacts/my-shot.png
+.\tools\capture-scene-viewer.ps1 -WarmupMilliseconds 3000 -OrbitCamera
+.\tools\capture-scene-viewer.ps1 -SkipBuild -ViewerArgs @("--scene", "config/scenes/bootstrap.scene.json")
+```
+
+Do not kill another agent's viewer process to get a clean screenshot. Wait for the window to be free or run the capture from an isolated checkout.
+
 ## MSVC Runtime Dialogs
 
 On Windows, MSVC debug-runtime failures can appear as desktop dialogs while the shell only shows a timeout, abort, or empty output. Agents must treat this as an inspectable failure mode, not as a mysterious hung test.

@@ -92,6 +92,22 @@ Build and run the Vulkan scene viewer:
 .\tools\run-scene-viewer.ps1
 ```
 
+Capture a viewer screenshot for agent or visual inspection:
+
+```powershell
+.\tools\capture-scene-viewer.ps1
+```
+
+By default this writes:
+
+```text
+build/msvc-debug/artifacts/scene-viewer-capture.png
+build/msvc-debug/artifacts/scene-viewer-capture.json
+build/msvc-debug/artifacts/scene-viewer-capture.viewer.json
+```
+
+The capture helper launches the native viewer, waits for the Vulkan window, saves the visible window pixels, then closes the viewer. Keep the viewer window unobstructed while it captures; this is a local inspection aid until the renderer owns a native `--screenshot-file` readback path.
+
 The viewer keeps running until the window is closed. Press Escape to close it from the keyboard. By default the camera is anchored behind the player model; pass `--orbit-camera` to use the orbiting inspection camera, or `--frames 3` for a short smoke test.
 
 Prototype controls:
