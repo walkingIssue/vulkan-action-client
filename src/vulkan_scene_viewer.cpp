@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -41,6 +40,7 @@
 
 #include "combat/combat_simulation.hpp"
 #include "config/control_profile.hpp"
+#include "input/glfw_control_bindings.hpp"
 #include "network/snapshot_client.hpp"
 #include "render/scene_geometry.hpp"
 #include "scene/scene_runtime.hpp"
@@ -122,21 +122,6 @@ struct CameraView
     float worldRadius = 32.0f;
 };
 
-struct ResolvedControlBindings
-{
-    std::vector<int> closeViewer;
-    std::vector<int> cameraModeToggle;
-    std::vector<int> playerMoveLeft;
-    std::vector<int> playerMoveRight;
-    std::vector<int> playerMoveForward;
-    std::vector<int> playerMoveBackward;
-    std::vector<int> playerSprint;
-    std::vector<int> sparringMoveLeft;
-    std::vector<int> sparringMoveRight;
-    std::vector<int> sparringMoveForward;
-    std::vector<int> sparringMoveBackward;
-};
-
 std::vector<char> readFile(const std::filesystem::path &path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -181,93 +166,6 @@ ViewerOptions parseOptions(int argc, char **argv)
     }
 
     return options;
-}
-
-std::string normalizedKeyName(std::string_view name)
-{
-    std::string normalized;
-    normalized.reserve(name.size());
-    for (const char c : name) {
-        if (c == '-' || c == ' ') {
-            normalized.push_back('_');
-        } else {
-            normalized.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
-        }
-    }
-    return normalized;
-}
-
-std::optional<int> glfwKeyCodeFromName(std::string_view name)
-{
-    const std::string key = normalizedKeyName(name);
-    if (key.size() == 1) {
-        const char c = key.front();
-        if (c >= 'A' && c <= 'Z') {
-            return GLFW_KEY_A + (c - 'A');
-        }
-        if (c >= '0' && c <= '9') {
-            return GLFW_KEY_0 + (c - '0');
-        }
-    }
-
-    static const std::unordered_map<std::string, int> kNamedKeys = {
-        {"ESC", GLFW_KEY_ESCAPE},
-        {"ESCAPE", GLFW_KEY_ESCAPE},
-        {"TAB", GLFW_KEY_TAB},
-        {"CAPS", GLFW_KEY_CAPS_LOCK},
-        {"CAPS_LOCK", GLFW_KEY_CAPS_LOCK},
-        {"LEFT_SHIFT", GLFW_KEY_LEFT_SHIFT},
-        {"RIGHT_SHIFT", GLFW_KEY_RIGHT_SHIFT},
-        {"SHIFT", GLFW_KEY_LEFT_SHIFT},
-        {"LEFT", GLFW_KEY_LEFT},
-        {"RIGHT", GLFW_KEY_RIGHT},
-        {"UP", GLFW_KEY_UP},
-        {"DOWN", GLFW_KEY_DOWN},
-        {"SPACE", GLFW_KEY_SPACE},
-        {"ENTER", GLFW_KEY_ENTER},
-        {"RETURN", GLFW_KEY_ENTER},
-        {"LEFT_CONTROL", GLFW_KEY_LEFT_CONTROL},
-        {"RIGHT_CONTROL", GLFW_KEY_RIGHT_CONTROL},
-        {"LEFT_ALT", GLFW_KEY_LEFT_ALT},
-        {"RIGHT_ALT", GLFW_KEY_RIGHT_ALT},
-    };
-
-    const auto it = kNamedKeys.find(key);
-    if (it == kNamedKeys.end()) {
-        return std::nullopt;
-    }
-    return it->second;
-}
-
-std::vector<int> resolveKeyList(const std::vector<std::string> &names, std::string_view actionName)
-{
-    std::vector<int> keys;
-    keys.reserve(names.size());
-    for (const std::string &name : names) {
-        const std::optional<int> keyCode = glfwKeyCodeFromName(name);
-        if (!keyCode.has_value()) {
-            throw std::runtime_error(fmt::format("Unknown key '{}' in action '{}'", name, actionName));
-        }
-        keys.push_back(*keyCode);
-    }
-    return keys;
-}
-
-ResolvedControlBindings resolveControlBindings(const vac::ControlBindings &bindings)
-{
-    return {
-        resolveKeyList(bindings.closeViewer, "close_viewer"),
-        resolveKeyList(bindings.cameraModeToggle, "camera_mode_toggle"),
-        resolveKeyList(bindings.playerMoveLeft, "player_move_left"),
-        resolveKeyList(bindings.playerMoveRight, "player_move_right"),
-        resolveKeyList(bindings.playerMoveForward, "player_move_forward"),
-        resolveKeyList(bindings.playerMoveBackward, "player_move_backward"),
-        resolveKeyList(bindings.playerSprint, "player_sprint"),
-        resolveKeyList(bindings.sparringMoveLeft, "sparring_move_left"),
-        resolveKeyList(bindings.sparringMoveRight, "sparring_move_right"),
-        resolveKeyList(bindings.sparringMoveForward, "sparring_move_forward"),
-        resolveKeyList(bindings.sparringMoveBackward, "sparring_move_backward"),
-    };
 }
 
 std::optional<std::filesystem::file_time_type> fileWriteTime(const std::filesystem::path &path)
@@ -331,7 +229,7 @@ public:
 private:
     ViewerOptions m_options;
     vac::ControlProfile m_controlProfile;
-    ResolvedControlBindings m_bindings;
+    vac::ResolvedControlBindings m_bindings;
     std::optional<std::filesystem::file_time_type> m_controlProfileWriteTime;
     vac::SceneRuntime m_scene;
     vac::SceneRenderData m_renderData;
@@ -471,7 +369,7 @@ private:
     void loadInitialControlProfile()
     {
         m_controlProfile = vac::loadControlProfile(m_options.controlProfilePath);
-        m_bindings = resolveControlBindings(m_controlProfile.bindings);
+        m_bindings = vac::resolveControlBindings(m_controlProfile.bindings);
         m_controlProfileWriteTime = fileWriteTime(m_options.controlProfilePath);
         spdlog::info("Loaded control profile '{}'", m_options.controlProfilePath.string());
     }
@@ -485,7 +383,7 @@ private:
 
         try {
             vac::ControlProfile nextProfile = vac::loadControlProfile(m_options.controlProfilePath);
-            ResolvedControlBindings nextBindings = resolveControlBindings(nextProfile.bindings);
+            vac::ResolvedControlBindings nextBindings = vac::resolveControlBindings(nextProfile.bindings);
             m_controlProfile = std::move(nextProfile);
             m_bindings = std::move(nextBindings);
             m_controlProfileWriteTime = writeTime;

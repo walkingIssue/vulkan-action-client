@@ -27,12 +27,32 @@ target_include_directories(scene_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+target_compile_definitions(scene_core PUBLIC
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
 target_link_libraries(scene_core PUBLIC
     assimp::assimp
     fmt::fmt
     glm::glm
     nlohmann_json::nlohmann_json
     spdlog::spdlog
+)
+
+add_library(input_core
+    src/input/glfw_control_bindings.cpp
+)
+
+target_compile_features(input_core PUBLIC cxx_std_20)
+
+target_include_directories(input_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(input_core PUBLIC
+    scene_core
+    fmt::fmt
+    glfw
 )
 
 add_library(network_core
@@ -105,10 +125,6 @@ add_executable(scene_probe
 
 target_compile_features(scene_probe PRIVATE cxx_std_20)
 
-target_compile_definitions(scene_probe PRIVATE
-    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
-)
-
 target_link_libraries(scene_probe PRIVATE
     scene_core
 )
@@ -135,13 +151,13 @@ add_dependencies(vulkan_scene_viewer
 target_compile_features(vulkan_scene_viewer PRIVATE cxx_std_20)
 
 target_compile_definitions(vulkan_scene_viewer PRIVATE
-    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
     VULKAN_ACTION_CLIENT_SCENE_VERT_SPV="${scene_vert_SPV}"
     VULKAN_ACTION_CLIENT_SCENE_FRAG_SPV="${scene_frag_SPV}"
 )
 
 target_link_libraries(vulkan_scene_viewer PRIVATE
     scene_core
+    input_core
     network_core
     Vulkan::Vulkan
     fmt::fmt
@@ -155,6 +171,30 @@ if(WIN32)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(movement_behavior_tests
+        tests/movement_behavior_tests.cpp
+    )
+
+    target_compile_features(movement_behavior_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(movement_behavior_tests PRIVATE
+        scene_core
+    )
+
+    add_test(NAME movement_behavior_tests COMMAND movement_behavior_tests)
+
+    add_executable(control_profile_tests
+        tests/control_profile_tests.cpp
+    )
+
+    target_compile_features(control_profile_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(control_profile_tests PRIVATE
+        input_core
+    )
+
+    add_test(NAME control_profile_tests COMMAND control_profile_tests)
+
     add_executable(network_protocol_tests
         tests/network_protocol_tests.cpp
     )
