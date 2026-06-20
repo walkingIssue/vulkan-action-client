@@ -1,9 +1,14 @@
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "combat/combat_scenario.hpp"
 
@@ -37,6 +42,43 @@ vac::combat::ScenarioRunResult runScenario(std::string_view fileName,
                                            vac::combat::ScenarioRunOptions options = {})
 {
     return vac::combat::runCombatScenario(vac::combat::loadCombatScenario(scenarioPath(fileName)), options);
+}
+
+bool hasDiagnostic(const vac::combat::ScenarioRunResult &result, std::string_view code, std::string_view fieldPath)
+{
+    for (const vac::combat::ScenarioDiagnostic &diagnostic : result.diagnostics) {
+        if (diagnostic.code == code && diagnostic.fieldPath == fieldPath) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void expectDiagnostic(const vac::combat::ScenarioRunResult &result, std::string_view code, std::string_view fieldPath)
+{
+    expect(hasDiagnostic(result, code, fieldPath),
+           "diagnostic " + std::string{code} + " at " + std::string{fieldPath});
+}
+
+std::filesystem::path writeMoveWithHitboxSocket(std::string_view socketName)
+{
+    const std::filesystem::path source = projectRoot() / "content/moves/light_attack.move.json";
+    std::ifstream input{source};
+    if (!input) {
+        throw std::runtime_error("Could not open source move " + source.string());
+    }
+
+    nlohmann::json document;
+    input >> document;
+    document.at("hitboxTracks").at(0).at("socket") = std::string{socketName};
+
+    const std::filesystem::path outputPath = std::filesystem::temp_directory_path() / "vac_rm1_003_bad_socket.move.json";
+    std::ofstream output{outputPath, std::ios::trunc};
+    if (!output) {
+        throw std::runtime_error("Could not write temporary move " + outputPath.string());
+    }
+    output << document.dump(2) << '\n';
+    return outputPath;
 }
 
 void goldenScenariosMatch()
@@ -91,6 +133,64 @@ void goldenMismatchReportsExpectedAndActual()
         expect(message.find("tick") != std::string::npos, "mismatch diagnostic includes tick context");
     }
 }
+
+void missingContentPathsReportStructuredDiagnostics()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.mapPath = "content/maps/rm1_missing.map.json";
+    scenario.movePaths[0] = "content/moves/rm1_missing.move.json";
+    scenario.animations[0].path = "content/animations/rm1_missing.proxy_anim.json";
+    scenario.goldenPath = "tests/fixtures/scenarios/goldens/rm1_missing.golden.json";
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "missing content graph exits error");
+    expect(result.message == "Scenario content graph validation failed", "missing content graph message");
+    expectDiagnostic(result, "missing_map_file", "map");
+    expectDiagnostic(result, "missing_move_file", "moves/0");
+    expectDiagnostic(result, "missing_proxy_animation_file", "animations/0/path");
+    expectDiagnostic(result, "missing_golden_file", "golden");
+    expect(result.trace.events.empty(), "missing content graph exits before simulation");
+}
+
+void unknownAnimationBindingReportsMoveDiagnostic()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.animations.push_back({
+        "move.unknown_rm1",
+        "content/animations/sword_light_proxy.anim.json",
+    });
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "unknown animation binding exits error");
+    expectDiagnostic(result, "unknown_animation_move", "animations/2/move");
+    expect(result.trace.events.empty(), "unknown animation binding exits before simulation");
+}
+
+void hitboxMoveRequiresProxyAnimationBinding()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.animations.erase(scenario.animations.begin());
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "missing move animation binding exits error");
+    expectDiagnostic(result, "missing_move_animation", "moves/0");
+    expect(result.trace.events.empty(), "missing move animation binding exits before simulation");
+}
+
+void hitboxSocketMustExistInBoundProxyAnimation()
+{
+    vac::combat::CombatScenario scenario =
+        vac::combat::loadCombatScenario(scenarioPath("sword_light_hits_idle_target.scenario.json"));
+    scenario.movePaths[0] = writeMoveWithHitboxSocket("rm1_missing_socket");
+
+    const vac::combat::ScenarioRunResult result = vac::combat::runCombatScenario(std::move(scenario));
+    expect(result.status == "error", "missing hitbox socket exits error");
+    expectDiagnostic(result, "missing_hitbox_socket", "moves/move.light_attack/hitboxTracks/blade_arc/socket");
+    expect(result.trace.events.empty(), "missing hitbox socket exits before simulation");
+}
 } // namespace
 
 int main()
@@ -100,6 +200,10 @@ int main()
         repeatedRunsAreDeterministic();
         guardedGoldenUpdateRequiresExplicitPermission();
         goldenMismatchReportsExpectedAndActual();
+        missingContentPathsReportStructuredDiagnostics();
+        unknownAnimationBindingReportsMoveDiagnostic();
+        hitboxMoveRequiresProxyAnimationBinding();
+        hitboxSocketMustExistInBoundProxyAnimation();
     } catch (const std::exception &error) {
         ++g_failures;
         std::cerr << "FAIL: unexpected exception: " << error.what() << '\n';
