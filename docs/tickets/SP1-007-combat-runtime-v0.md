@@ -1,8 +1,8 @@
 # SP1-007: Combat Runtime v0
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-007-combat-runtime-v0
-Start commit: pending
+Start commit: `243b966`
 Source plan: `docs/sprint-01-implementation-plan.md`
 Source design sections:
 - `docs/action_combat_engine_editor_design.md` section 13.1: Combat model
@@ -94,11 +94,21 @@ Ownership boundaries:
 ## Progress Log
 
 - 2026-06-20: Started after SP1-006 move schema/compiler was merged.
+- 2026-06-20: Added combat runtime core, command buffering, active move state, phase/authored events, cancel checks, hitstop/stun counters, authored dodge/hit reaction moves, and CTest coverage.
 
 ## Verification Results
 
-Pending.
+- `cmake --preset msvc-debug` passed.
+- `cmake --build --preset msvc-debug` passed.
+- `ctest --preset msvc-debug-combat` passed: 4/4 tests.
+- `ctest --preset msvc-debug-content` passed: 2/2 tests.
+- `ctest --preset msvc-debug-simulation` passed: 1/1 test.
+- `ctest --preset msvc-debug-unit` passed: 10/10 tests.
+- `ctest --preset msvc-debug-characterization` passed: 2/2 tests.
+- `ctest --preset msvc-debug` passed: 12/12 tests, including `network_e2e` and `viewer_smoke`.
+- `build/msvc-debug/test-artifacts/viewer_smoke_result.json` reported `status: ok`, `host: vulkan_scene_viewer`, and `frames: 3`.
+- No MSVC runtime/assertion windows were visible after verification.
 
 ## Final Commits
 
-Pending.
+- `aebfe8c` Add SP1-007 combat runtime
