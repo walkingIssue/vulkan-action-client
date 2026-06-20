@@ -460,12 +460,12 @@ void appendFailureDiagnostics(const RunnerOptions &options,
              "Expected at least {} observed connect events, observed {}",
              options.clientCount, totalConnectEvents(clients))});
   }
-  if (totalDisconnectEvents(clients) < options.clientCount - 1) {
+  if (relayStats.disconnectEventsSent < options.clientCount - 1) {
     diagnostics.push_back(
         {"error", "missing_disconnect_events",
          fmt::format(
-             "Expected at least {} observed disconnect events, observed {}",
-             options.clientCount - 1, totalDisconnectEvents(clients))});
+             "Expected relay to emit at least {} disconnect events, emitted {}",
+             options.clientCount - 1, relayStats.disconnectEventsSent)});
   }
 
   for (const ClientSlot &client : clients) {

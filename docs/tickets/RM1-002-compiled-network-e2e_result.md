@@ -17,7 +17,7 @@ Implementation commit after RM1-003 rebase: `d6d2a20`
 
 - The canonical E2E test starts an in-process UDP relay loop around `SnapshotRelay`.
 - Client slots use real `SnapshotClient` instances and loopback UDP sockets.
-- The runner verifies connect fanout, snapshot fanout, disconnect cleanup, and final relay drain to zero connected clients.
+- The runner verifies connect fanout, snapshot fanout, relay-emitted disconnect fanout, and final relay drain to zero connected clients.
 - Invalid client-count and unknown-option paths return nonzero and write structured diagnostics when `--result-file` is supplied.
 - CTest labels remain `network;e2e`, so existing `msvc-debug-network` and `msvc-debug-e2e` presets continue to select the test.
 
@@ -64,7 +64,7 @@ The exact per-client remote snapshot counts can vary slightly with loopback timi
 
 - This removes PowerShell from the canonical CTest path, but it does not prove multi-process server/client launch behavior. The retained PowerShell/manual tools still cover ad hoc process-boundary testing.
 - The runner uses a fixed default loopback port. It supports `--port` for collision debugging, but a future harness could allocate an OS port dynamically if `UdpSocket` exposes the bound endpoint.
-- The client orchestration is intentionally deterministic rather than a full concurrent soak test. Future network tickets should add longer-running compatibility/version tests when protocol stability becomes a product requirement.
+- The client orchestration is intentionally deterministic rather than a full concurrent soak test. Client-observed disconnect events remain in the result JSON for debugging, but the hard gate uses relay-emitted disconnect events plus final relay drain because individual client-side receipt can race teardown. Future network tickets should add longer-running compatibility/version tests when protocol stability becomes a product requirement.
 
 ## Merge State
 

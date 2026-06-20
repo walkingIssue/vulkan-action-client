@@ -88,6 +88,7 @@ Ownership boundaries:
 
 - UDP loopback timing can be flaky if the runner relies on fixed sleeps only; use deadlines and drain loops.
 - Reusing a fixed port can collide with a manually running relay; support `--port` for debugging and use an uncommon default.
+- Client-observed disconnect events are timing-sensitive during teardown, so the hard gate uses relay-emitted disconnect events plus final relay drain while still reporting per-client observations.
 - `SnapshotClient` sends disconnect packets in its destructor, so client lifetime/shutdown order must be explicit.
 - Keep CMake edits focused to the new runner target and `network_e2e` test command.
 - If RM1-003 merges while this branch is active, rebase before final verification.
