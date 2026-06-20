@@ -3,28 +3,35 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 
 #include <fmt/format.h>
 
+#include "host/host_cli.hpp"
+
 namespace
 {
-std::filesystem::path scenePathFromArgs(int argc, char **argv)
+std::filesystem::path scenePathFromOptions(const vac::host::CommonHostOptions &options)
 {
-    for (int i = 1; i + 1 < argc; ++i) {
-        if (std::string_view{argv[i]} == "--scene") {
-            return argv[i + 1];
-        }
+    if (options.scene.has_value()) {
+        return *options.scene;
     }
-
     return vac::defaultProjectRoot() / "config/scenes/bootstrap.scene.json";
 }
 } // namespace
 
 int main(int argc, char **argv)
 {
+    std::optional<std::filesystem::path> resultFile;
     try {
+        vac::host::CommandLine commandLine{argc, argv};
+        const vac::host::CommonHostOptions commonOptions = vac::host::parseCommonOptions(commandLine);
+        resultFile = commonOptions.resultFile;
+        vac::host::rejectUnsupportedCommonOptions(commonOptions, {"--scene", "--result-file"});
+        commandLine.rejectUnknown();
+
         const std::filesystem::path projectRoot = vac::defaultProjectRoot();
-        const std::filesystem::path scenePath = scenePathFromArgs(argc, argv);
+        const std::filesystem::path scenePath = scenePathFromOptions(commonOptions);
         const vac::SceneRuntime scene = vac::loadScene(scenePath, projectRoot);
 
         std::cout << fmt::format("Scene '{}'\n", scene.name);
@@ -68,9 +75,25 @@ int main(int argc, char **argv)
         }
 
         std::cout << fmt::format("  world bounds: {}\n", vac::formatBounds(scene.worldBounds));
+        if (resultFile.has_value()) {
+            vac::host::HostResult result = vac::host::resultFromOptions("scene_probe", commonOptions);
+            result.message = fmt::format("Loaded scene '{}'", scene.name);
+            vac::host::writeResultFile(*resultFile, result);
+        }
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "scene_probe failed: " << error.what() << "\n";
+        if (resultFile.has_value()) {
+            try {
+                vac::host::HostResult result;
+                result.host = "scene_probe";
+                result.status = "error";
+                result.message = error.what();
+                vac::host::writeResultFile(*resultFile, result);
+            } catch (const std::exception &resultError) {
+                std::cerr << "scene_probe could not write result file: " << resultError.what() << "\n";
+            }
+        }
         return 1;
     }
 }

@@ -41,6 +41,7 @@
 
 #include "combat/combat_simulation.hpp"
 #include "config/control_profile.hpp"
+#include "host/host_cli.hpp"
 #include "input/glfw_control_bindings.hpp"
 #include "network/snapshot_client.hpp"
 #include "render/scene_geometry.hpp"
@@ -75,6 +76,7 @@ struct ViewerOptions
     uint8_t networkClientId = 0;
     uint32_t frames = 0;
     bool orbitCamera = false;
+    vac::host::CommonHostOptions common;
 };
 
 struct QueueFamilyIndices
@@ -144,32 +146,40 @@ std::vector<char> readFile(const std::filesystem::path &path)
 
 ViewerOptions parseOptions(int argc, char **argv)
 {
+    vac::host::CommandLine commandLine{argc, argv};
     ViewerOptions options;
+    options.common = vac::host::parseCommonOptions(commandLine);
+    vac::host::rejectUnsupportedCommonOptions(options.common, {"--scene", "--frames", "--result-file"});
+
     options.scenePath = vac::defaultProjectRoot() / "config/scenes/bootstrap.scene.json";
     options.controlProfilePath = vac::defaultControlProfilePath();
-
-    for (int i = 1; i < argc; ++i) {
-        const std::string_view arg{argv[i]};
-        if (arg == "--scene" && i + 1 < argc) {
-            options.scenePath = argv[++i];
-        } else if (arg == "--control-profile" && i + 1 < argc) {
-            options.controlProfilePath = argv[++i];
-        } else if (arg == "--net-server" && i + 1 < argc) {
-            options.networkServer = argv[++i];
-        } else if (arg == "--net-client-id" && i + 1 < argc) {
-            const int clientId = std::stoi(argv[++i]);
-            if (clientId < 0 || clientId > 255) {
-                throw std::runtime_error("--net-client-id must be between 0 and 255");
-            }
-            options.networkClientId = static_cast<uint8_t>(clientId);
-        } else if (arg == "--frames" && i + 1 < argc) {
-            options.frames = static_cast<uint32_t>(std::max(0, std::stoi(argv[++i])));
-        } else if (arg == "--orbit-camera") {
-            options.orbitCamera = true;
-        } else if (arg == "--static-camera") {
-            options.orbitCamera = false;
-        }
+    if (options.common.scene.has_value()) {
+        options.scenePath = *options.common.scene;
     }
+    if (options.common.frames.has_value()) {
+        options.frames = *options.common.frames;
+    }
+
+    if (const std::optional<std::string> controlProfile = commandLine.consumeValue("--control-profile")) {
+        options.controlProfilePath = *controlProfile;
+    }
+    if (const std::optional<std::string> networkServer = commandLine.consumeValue("--net-server")) {
+        options.networkServer = *networkServer;
+    }
+    if (const std::optional<std::string> clientIdValue = commandLine.consumeValue("--net-client-id")) {
+        const int clientId = std::stoi(*clientIdValue);
+        if (clientId < 0 || clientId > 255) {
+            throw std::runtime_error("--net-client-id must be between 0 and 255");
+        }
+        options.networkClientId = static_cast<uint8_t>(clientId);
+    }
+    if (commandLine.consumeFlag("--orbit-camera")) {
+        options.orbitCamera = true;
+    }
+    if (commandLine.consumeFlag("--static-camera")) {
+        options.orbitCamera = false;
+    }
+    commandLine.rejectUnknown();
 
     return options;
 }
@@ -2340,13 +2350,33 @@ private:
 
 int main(int argc, char **argv)
 {
+    std::optional<std::filesystem::path> resultFile;
     try {
         const ViewerOptions options = parseOptions(argc, argv);
+        resultFile = options.common.resultFile;
         VulkanSceneViewer viewer{options};
         viewer.run();
+        if (resultFile.has_value()) {
+            vac::host::HostResult result = vac::host::resultFromOptions("vulkan_scene_viewer", options.common);
+            result.message = options.frames > 0
+                ? fmt::format("Rendered {} frame(s)", options.frames)
+                : "Viewer exited normally";
+            vac::host::writeResultFile(*resultFile, result);
+        }
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "vulkan_scene_viewer failed: " << error.what() << "\n";
+        if (resultFile.has_value()) {
+            try {
+                vac::host::HostResult result;
+                result.host = "vulkan_scene_viewer";
+                result.status = "error";
+                result.message = error.what();
+                vac::host::writeResultFile(*resultFile, result);
+            } catch (const std::exception &resultError) {
+                std::cerr << "vulkan_scene_viewer could not write result file: " << resultError.what() << "\n";
+            }
+        }
         return 1;
     }
 }
