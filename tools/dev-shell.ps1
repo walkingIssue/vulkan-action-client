@@ -94,6 +94,8 @@ if ($vulkanSdk) {
 
 Add-PathEntry (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links")
 Add-PathEntry (Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps")
+Add-PathEntry "C:\Program Files\Git LFS"
+Add-PathEntry "C:\Program Files\LLVM\bin"
 
 $workspaceTools = Resolve-Path (Join-Path $PSScriptRoot "..\..\tools") -ErrorAction SilentlyContinue
 if ($workspaceTools) {

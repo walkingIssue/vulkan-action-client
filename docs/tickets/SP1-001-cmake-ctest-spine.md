@@ -1,6 +1,6 @@
 # SP1-001: CMake and CTest Spine
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-001-cmake-ctest-spine
 Start commit: this ticket-start commit on `main`
 Source plan: `docs/sprint-01-implementation-plan.md`
@@ -96,8 +96,19 @@ Ownership boundaries:
 
 ## Verification Results
 
-Pending.
+- `cmake --list-presets`
+- `ctest --list-presets`
+- `. .\tools\dev-shell.ps1; cmake --preset msvc-debug`
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug`
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug`
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-unit`
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-network`
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-e2e`
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug-combat`
+- `.\tools\test.ps1 -Preset msvc-debug`
+
+All test runs passed.
 
 ## Final Commits
 
-Pending.
+- `7f7116d Add CMake and CTest presets`

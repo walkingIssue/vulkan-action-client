@@ -182,6 +182,10 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME movement_behavior_tests COMMAND movement_behavior_tests)
+    set_tests_properties(movement_behavior_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;combat;movement"
+    )
 
     add_executable(control_profile_tests
         tests/control_profile_tests.cpp
@@ -194,6 +198,10 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME control_profile_tests COMMAND control_profile_tests)
+    set_tests_properties(control_profile_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;config;input"
+    )
 
     add_executable(network_protocol_tests
         tests/network_protocol_tests.cpp
@@ -206,6 +214,10 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME network_protocol_tests COMMAND network_protocol_tests)
+    set_tests_properties(network_protocol_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;network;protocol"
+    )
 
     add_executable(snapshot_relay_tests
         tests/snapshot_relay_tests.cpp
@@ -218,6 +230,10 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME snapshot_relay_tests COMMAND snapshot_relay_tests)
+    set_tests_properties(snapshot_relay_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;network;relay"
+    )
 
     add_executable(network_e2e_client
         tests/network_e2e_client.cpp
@@ -235,5 +251,8 @@ if(BUILD_TESTING)
                 -File "${CMAKE_CURRENT_SOURCE_DIR}/tools/test-network-e2e.ps1"
                 -BuildDir "$<TARGET_FILE_DIR:network_e2e_client>"
     )
-    set_tests_properties(network_e2e PROPERTIES TIMEOUT 30 LABELS e2e)
+    set_tests_properties(network_e2e PROPERTIES
+        TIMEOUT 30
+        LABELS "network;e2e"
+    )
 endif()
