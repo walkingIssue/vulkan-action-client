@@ -17,6 +17,8 @@ That does not mean we need to read USB ports directly. For normal keyboards, mic
 
 DirectInput exists and is COM-based, but it is legacy for most modern game use. COM is still alive on Windows, but "COM object" is not automatically lower latency or more correct than Raw Input/GameInput.
 
+For the first controller path, use XInput. It is narrow, stable, and enough for Xbox-compatible pads while we are still building the combat input model.
+
 ## Desired Engine Shape
 
 The platform layer should collect input events as soon as the OS delivers them:
@@ -53,4 +55,4 @@ That gives us clean edge detection, buffering windows, cancel checks, replay, ro
 
 For the prototype, keep GLFW for the window. Add a platform input module that records GLFW callbacks into an input queue, then later replace or supplement that module with Win32 Raw Input without changing the combat state machine API.
 
-When we outgrow GLFW callbacks, the Windows-specific path should use Raw Input with `RegisterRawInputDevices` and `WM_INPUT`, plus XInput or GameInput for controllers. Direct USB/HID access should be reserved for custom hardware.
+When we outgrow GLFW callbacks, the Windows-specific path should use Raw Input with `RegisterRawInputDevices` and `WM_INPUT`, plus XInput for controllers. GameInput can come later if we need broader device support. Direct USB/HID access should be reserved for custom hardware.

@@ -998,15 +998,35 @@ private:
 
     glm::mat4 viewProjection() const
     {
-        const glm::vec3 center = m_scene.worldBounds.valid
-            ? (m_scene.worldBounds.min + m_scene.worldBounds.max) * 0.5f
+        vac::Bounds focusBounds;
+        for (const vac::SceneInstance &instance : m_scene.instances) {
+            if (!instance.worldBounds.valid) {
+                continue;
+            }
+            if (!focusBounds.valid) {
+                focusBounds = instance.worldBounds;
+            } else {
+                focusBounds.min = glm::min(focusBounds.min, instance.worldBounds.min);
+                focusBounds.max = glm::max(focusBounds.max, instance.worldBounds.max);
+            }
+        }
+
+        const vac::Bounds &cameraBounds = focusBounds.valid ? focusBounds : m_scene.worldBounds;
+        const glm::vec3 center = cameraBounds.valid
+            ? (cameraBounds.min + cameraBounds.max) * 0.5f
             : glm::vec3{0.0f, 4.0f, 0.0f};
-        const glm::vec3 extent = m_scene.worldBounds.valid
-            ? m_scene.worldBounds.max - m_scene.worldBounds.min
+        const glm::vec3 extent = cameraBounds.valid
+            ? cameraBounds.max - cameraBounds.min
             : glm::vec3{18.0f, 12.0f, 18.0f};
-        const float radius = std::max({extent.x, extent.y, extent.z, 18.0f}) * 0.5f;
-        const float cameraDistance = radius * 1.75f;
-        const float cameraHeight = std::max(radius * 0.75f, 8.0f);
+        const float focusRadius = std::max({extent.x, extent.y, extent.z, 18.0f}) * 0.5f;
+        const float worldRadius = m_scene.worldBounds.valid
+            ? std::max({m_scene.worldBounds.max.x - m_scene.worldBounds.min.x,
+                        m_scene.worldBounds.max.y - m_scene.worldBounds.min.y,
+                        m_scene.worldBounds.max.z - m_scene.worldBounds.min.z,
+                        18.0f}) * 0.5f
+            : focusRadius;
+        const float cameraDistance = focusRadius * 2.4f;
+        const float cameraHeight = std::max(focusRadius * 0.95f, 10.0f);
 
         glm::vec3 cameraOffset{cameraDistance * 0.62f, cameraHeight, cameraDistance};
         if (m_options.orbitCamera) {
@@ -1021,7 +1041,7 @@ private:
         glm::mat4 projection = glm::perspective(glm::radians(50.0f),
                                                 static_cast<float>(m_swapChainExtent.width) / static_cast<float>(m_swapChainExtent.height),
                                                 0.1f,
-                                                std::max(100.0f, radius * 6.0f));
+                                                std::max(100.0f, worldRadius * 6.0f));
         projection[1][1] *= -1.0f;
         return projection * view;
     }
