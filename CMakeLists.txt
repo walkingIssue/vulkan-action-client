@@ -78,6 +78,21 @@ if(WIN32)
     target_link_libraries(network_core PUBLIC Ws2_32)
 endif()
 
+add_library(host_core
+    src/host/host_cli.cpp
+)
+
+target_compile_features(host_core PUBLIC cxx_std_20)
+
+target_include_directories(host_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(host_core PUBLIC
+    fmt::fmt
+    nlohmann_json::nlohmann_json
+)
+
 include(CTest)
 
 function(add_shader TARGET_NAME SOURCE_FILE)
@@ -127,6 +142,7 @@ target_compile_features(scene_probe PRIVATE cxx_std_20)
 
 target_link_libraries(scene_probe PRIVATE
     scene_core
+    host_core
 )
 
 add_executable(udp_state_server
@@ -157,6 +173,7 @@ target_compile_definitions(vulkan_scene_viewer PRIVATE
 
 target_link_libraries(vulkan_scene_viewer PRIVATE
     scene_core
+    host_core
     input_core
     network_core
     Vulkan::Vulkan
@@ -217,6 +234,22 @@ if(BUILD_TESTING)
     set_tests_properties(network_protocol_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;network;protocol"
+    )
+
+    add_executable(host_cli_tests
+        tests/host_cli_tests.cpp
+    )
+
+    target_compile_features(host_cli_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(host_cli_tests PRIVATE
+        host_core
+    )
+
+    add_test(NAME host_cli_tests COMMAND host_cli_tests)
+    set_tests_properties(host_cli_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;host"
     )
 
     add_executable(snapshot_relay_tests

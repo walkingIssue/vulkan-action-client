@@ -59,6 +59,17 @@ ctest --preset msvc-debug-combat
 
 The project uses vcpkg manifest mode through `CMakePresets.json`; CMake runs vcpkg install during configure. The PowerShell scripts in `tools/` are convenience wrappers around the same preset path.
 
+## Host Automation
+
+Hosts and tools are moving toward a shared automation contract. Supported executables reject unknown options, and tools that opt in can write structured JSON results:
+
+```powershell
+.\build\msvc-debug\scene_probe.exe --scene config/scenes/bootstrap.scene.json --result-file build/msvc-debug/test-artifacts/scene_probe_result.json
+.\build\msvc-debug\vulkan_scene_viewer.exe --frames 3 --result-file build/msvc-debug/test-artifacts/viewer_result.json
+```
+
+The common parser recognizes future-facing flags such as `--ticks`, `--offline`, `--headless`, `--hidden-window`, `--input-script`, `--command-script`, `--seed`, and `--log-file`; each executable still rejects common flags it does not support yet.
+
 ## Bootstrap Scene
 
 The first scene uses a procedural floor plus character instances because no environment scene models are present yet.

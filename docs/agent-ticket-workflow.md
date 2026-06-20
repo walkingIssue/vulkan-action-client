@@ -21,7 +21,7 @@ flowchart TD
   Verify["Run targeted tests\nthen broader preset tests"]
   UpdateDoc["Update ticket doc\nresults, decisions, artifacts"]
   Merge["Merge back to main\nno unrelated files"]
-  Final["Report outcome\ncommit ids, tests, residual risk"]
+  Final["Report outcome\ncommit ids, tests, residual risks by producing a featname_result.md"]
 
   Intake --> Baseline
   Baseline --> TicketDoc

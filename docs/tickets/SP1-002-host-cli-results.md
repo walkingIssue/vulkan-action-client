@@ -1,6 +1,6 @@
 # SP1-002: Common Host CLI and Result Files
 
-Status: planned
+Status: implemented
 Branch: sprint01/sp1-002-host-cli-results
 Start commit: this ticket-start commit on `main`
 Source plan: `docs/sprint-01-implementation-plan.md`
@@ -99,8 +99,15 @@ Ownership boundaries:
 
 ## Verification Results
 
-Pending.
+- `. .\tools\dev-shell.ps1; cmake --build --preset msvc-debug`
+- `. .\tools\dev-shell.ps1; ctest --preset msvc-debug`
+- `.\build\msvc-debug\scene_probe.exe --scene config/scenes/bootstrap.scene.json --result-file build/msvc-debug/test-artifacts/scene_probe_result.json`
+- `.\build\msvc-debug\vulkan_scene_viewer.exe --frames 3 --result-file build/msvc-debug/test-artifacts/viewer_result.json`
+- `.\build\msvc-debug\scene_probe.exe --bogus`
+- `.\build\msvc-debug\vulkan_scene_viewer.exe --bogus`
+
+All build and CTest runs passed. Result files were written for `scene_probe` and `vulkan_scene_viewer`. Invalid option checks failed with nonzero exit as expected.
 
 ## Final Commits
 
-Pending.
+- `0c2807d Add common host CLI result files`
