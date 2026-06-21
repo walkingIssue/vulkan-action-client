@@ -3,9 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <unordered_map>
+#include <limits>
 #include <string_view>
 #include <stdexcept>
+#include <unordered_map>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -328,6 +329,23 @@ std::string boolString(bool value)
     return value ? "true" : "false";
 }
 
+uint32_t clampedPlaybackTick(const VisualLabPlaybackState &state, uint32_t tick)
+{
+    return std::min(tick, state.durationTicks);
+}
+
+std::string joinStrings(const std::vector<std::string> &values, std::string_view separator)
+{
+    std::string result;
+    for (const std::string &value : values) {
+        if (!result.empty()) {
+            result += separator;
+        }
+        result += value;
+    }
+    return result;
+}
+
 void appendScenarioResultDiagnostics(std::vector<std::string> &diagnostics,
                                      const combat::ScenarioRunResult &scenarioResult)
 {
@@ -349,6 +367,23 @@ void appendScenarioResultDiagnostics(std::vector<std::string> &diagnostics,
     for (const combat::ScenarioDiagnostic &diagnostic : scenarioResult.diagnostics) {
         addScenarioDiagnostic(diagnostics, diagnostic);
     }
+}
+
+void appendPlaybackAndEvidenceDiagnostics(std::vector<std::string> &diagnostics,
+                                          const VisualLabPlaybackState &playback,
+                                          const VisualLabScenarioEvidenceSummary &evidence)
+{
+    std::vector<std::string> playbackValues = playbackDiagnostics(playback);
+    diagnostics.insert(diagnostics.end(), playbackValues.begin(), playbackValues.end());
+
+    VisualLabPlaybackState previewStep = stepPlayback(playback);
+    diagnostics.push_back("playbackPreviewStepTick=" + std::to_string(previewStep.currentTick));
+    diagnostics.push_back("playbackPreviewResetTick=" + std::to_string(resetPlayback(previewStep).currentTick));
+    diagnostics.push_back("playbackPreviewSeekEndTick=" +
+                          std::to_string(seekPlayback(playback, playback.durationTicks + 1000u).currentTick));
+
+    std::vector<std::string> evidenceValues = scenarioEvidenceDiagnostics(evidence);
+    diagnostics.insert(diagnostics.end(), evidenceValues.begin(), evidenceValues.end());
 }
 
 void populateVisualLabScene(VisualLabScene &result,
@@ -444,6 +479,9 @@ VisualLabScene buildVisualLabSceneFromScenario(const std::filesystem::path &scen
     combat::CombatScenario scenario = combat::loadCombatScenario(scenarioPath);
     const combat::ScenarioRunResult scenarioResult = combat::runCombatScenario(scenario);
     appendScenarioResultDiagnostics(result.resultDiagnostics, scenarioResult);
+    result.playback = makePlaybackState(scenarioResult.trace.ticksRun);
+    result.scenarioEvidence = summarizeScenarioEvidence(scenarioResult.trace);
+    appendPlaybackAndEvidenceDiagnostics(result.resultDiagnostics, result.playback, result.scenarioEvidence);
     if (scenarioResult.status != "ok") {
         if (scenarioResult.diagnostics.empty()) {
             result.diagnostics.push_back("scenario: " + scenarioResult.message);
@@ -529,6 +567,84 @@ VisualLabScene buildVisualLabSceneFromScenario(const std::filesystem::path &scen
     return result;
 }
 
+VisualLabPlaybackState makePlaybackState(uint32_t durationTicks)
+{
+    VisualLabPlaybackState state;
+    state.durationTicks = durationTicks;
+    state.currentTick = 0;
+    state.paused = true;
+    state.running = false;
+    return state;
+}
+
+VisualLabPlaybackState setPlaybackPaused(VisualLabPlaybackState state, bool paused)
+{
+    state.paused = paused;
+    state.running = !paused;
+    state.currentTick = clampedPlaybackTick(state, state.currentTick);
+    return state;
+}
+
+VisualLabPlaybackState resetPlayback(VisualLabPlaybackState state)
+{
+    state.currentTick = 0;
+    state.paused = true;
+    state.running = false;
+    return state;
+}
+
+VisualLabPlaybackState stepPlayback(VisualLabPlaybackState state, uint32_t ticks)
+{
+    const uint32_t remaining = state.durationTicks - clampedPlaybackTick(state, state.currentTick);
+    state.currentTick += std::min(ticks, remaining);
+    state.currentTick = clampedPlaybackTick(state, state.currentTick);
+    state.paused = true;
+    state.running = false;
+    return state;
+}
+
+VisualLabPlaybackState seekPlayback(VisualLabPlaybackState state, uint32_t tick)
+{
+    state.currentTick = clampedPlaybackTick(state, tick);
+    return state;
+}
+
+VisualLabScenarioEvidenceSummary summarizeScenarioEvidence(const combat::ScenarioTrace &trace)
+{
+    VisualLabScenarioEvidenceSummary summary;
+    summary.eventCount = static_cast<uint32_t>(trace.events.size());
+    if (!trace.events.empty()) {
+        summary.firstEventTick = trace.events.front().tick;
+        summary.lastEventTick = trace.events.front().tick;
+    }
+
+    uint32_t lowestRemainingHealth = std::numeric_limits<uint32_t>::max();
+    for (const combat::ScenarioTraceEvent &event : trace.events) {
+        summary.firstEventTick = std::min(summary.firstEventTick, event.tick);
+        summary.lastEventTick = std::max(summary.lastEventTick, event.tick);
+        if (event.kind == "hit") {
+            ++summary.hitEventCount;
+        }
+        if (event.kind == "hit_blocked") {
+            ++summary.blockedHitEventCount;
+        }
+        if (event.hasEffect) {
+            ++summary.effectEventCount;
+            summary.totalDamage += event.damage;
+            summary.maxDamage = std::max(summary.maxDamage, event.damage);
+            lowestRemainingHealth = std::min(lowestRemainingHealth, event.targetRemainingHealth);
+            if (!event.reactionMove.empty() &&
+                std::find(summary.reactionMoves.begin(), summary.reactionMoves.end(), event.reactionMove) ==
+                    summary.reactionMoves.end()) {
+                summary.reactionMoves.push_back(event.reactionMove);
+            }
+        }
+    }
+    summary.lowestRemainingHealth =
+        summary.effectEventCount == 0 ? 0u : lowestRemainingHealth;
+    return summary;
+}
+
 std::vector<std::string> summaryDiagnostics(const VisualLabSummary &summary)
 {
     return {
@@ -544,6 +660,36 @@ std::vector<std::string> summaryDiagnostics(const VisualLabSummary &summary)
         "rootMotionPathSegmentCount=" + std::to_string(summary.rootMotionPathSegmentCount),
         "interpolationSampleCount=" + std::to_string(summary.interpolationSampleCount),
         "debugLineVertexCount=" + std::to_string(summary.debugLineVertexCount),
+    };
+}
+
+std::vector<std::string> playbackDiagnostics(const VisualLabPlaybackState &state)
+{
+    return {
+        "visualLabPlayback=true",
+        "playbackCurrentTick=" + std::to_string(state.currentTick),
+        "playbackDurationTicks=" + std::to_string(state.durationTicks),
+        "playbackPaused=" + boolString(state.paused),
+        "playbackRunning=" + boolString(state.running),
+        "playbackCanStepForward=" + boolString(state.currentTick < state.durationTicks),
+    };
+}
+
+std::vector<std::string> scenarioEvidenceDiagnostics(const VisualLabScenarioEvidenceSummary &summary)
+{
+    return {
+        "scenarioEvidenceEventCount=" + std::to_string(summary.eventCount),
+        "scenarioEvidenceFirstTick=" + std::to_string(summary.firstEventTick),
+        "scenarioEvidenceLastTick=" + std::to_string(summary.lastEventTick),
+        "scenarioEvidenceEffectEventCount=" + std::to_string(summary.effectEventCount),
+        "scenarioEvidenceHitEventCount=" + std::to_string(summary.hitEventCount),
+        "scenarioEvidenceBlockedHitEventCount=" + std::to_string(summary.blockedHitEventCount),
+        "scenarioEvidenceTotalDamage=" + std::to_string(summary.totalDamage),
+        "scenarioEvidenceMaxDamage=" + std::to_string(summary.maxDamage),
+        "scenarioEvidenceLowestRemainingHealth=" + std::to_string(summary.lowestRemainingHealth),
+        "scenarioEvidenceHasDamage=" + boolString(summary.totalDamage > 0),
+        "scenarioEvidenceHasReaction=" + boolString(!summary.reactionMoves.empty()),
+        "scenarioEvidenceReactionMoves=" + joinStrings(summary.reactionMoves, ","),
     };
 }
 } // namespace vac::visual_lab
