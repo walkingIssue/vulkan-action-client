@@ -1,5 +1,9 @@
 # Sprint 02 Implementation Plan: Combat Semantics and Character Foundations
 
+Status: interrupted after SP2-004. `SP2-005` was never dispatched and is deferred by the Sprint 03 reset.
+
+Active replacement plan: `docs/sprint-03-implementation-plan.md`
+
 Source design: `docs/action_combat_engine_editor_design.md`
 Source closeouts:
 - `docs/sprint-01-implementation-plan.md`

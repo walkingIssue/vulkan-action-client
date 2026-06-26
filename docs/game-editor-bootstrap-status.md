@@ -4,6 +4,8 @@ Updated: 2026-06-26
 
 The provisional editor shell landed in `045551a Add game editor bootstrap and visual QA skill`.
 
+Sprint 03 restarts active editor work around UI coverage, current-scene rendering, renderable asset discovery, viewer extraction, and game executable export. See `docs/sprint-03-implementation-plan.md`.
+
 ## What Exists
 
 - `game_editor` is a separate CMake executable backed by GLFW, Vulkan, and ImGui.

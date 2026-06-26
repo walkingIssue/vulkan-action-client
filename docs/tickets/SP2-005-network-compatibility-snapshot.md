@@ -1,9 +1,10 @@
 # SP2-005: Network Compatibility Snapshot v1
 
-Status: planned late/stretch
+Status: deferred by Sprint 03 reset
 Branch: sprint02/sp2-005-network-compatibility-snapshot
 Start commit: TBD by dispatched owner
 Source plan: `docs/sprint-02-implementation-plan.md`
+Replacement planning context: `docs/sprint-03-implementation-plan.md`
 Source result docs:
 - `docs/tickets/RM1-002-compiled-network-e2e_result.md`
 - `docs/tickets/SP1-003-characterization_result.md`
@@ -11,6 +12,8 @@ Source result docs:
 ## Goal
 
 Capture and test the current snapshot relay/protocol/result-file contract as a narrow compatibility snapshot, without defining future authoritative combat networking too early.
+
+This ticket was never dispatched. Keep it as historical planned work until Mia/user explicitly reopens network compatibility in a later sprint.
 
 ## Non-Goals
 
