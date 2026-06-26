@@ -41,11 +41,12 @@
 
 #include "combat/combat_simulation.hpp"
 #include "config/control_profile.hpp"
-#include "host/host_cli.hpp"
 #include "input/glfw_control_bindings.hpp"
 #include "network/snapshot_client.hpp"
 #include "render/scene_geometry.hpp"
 #include "scene/scene_runtime.hpp"
+#include "viewer/viewer_camera.hpp"
+#include "viewer/viewer_options.hpp"
 #include "visual_lab/visual_lab.hpp"
 
 namespace
@@ -53,11 +54,6 @@ namespace
 constexpr uint32_t kWidth = 1280;
 constexpr uint32_t kHeight = 720;
 constexpr int kMaxFramesInFlight = 1;
-constexpr float kDefaultCameraDistanceWorldUnits = 42.0f;
-constexpr float kMaxCameraDistanceWorldUnits = kDefaultCameraDistanceWorldUnits * 3.0f;
-constexpr float kMinCameraDistanceWorldUnits = 0.0f;
-constexpr float kCameraScrollZoomStepWorldUnits = 6.0f;
-constexpr float kCameraFirstPersonBlendDistanceWorldUnits = 10.0f;
 
 const std::vector<const char *> kValidationLayers = {
     "VK_LAYER_KHRONOS_validation",
@@ -68,21 +64,6 @@ constexpr bool kEnableValidationLayers = false;
 #else
 constexpr bool kEnableValidationLayers = true;
 #endif
-
-struct ViewerOptions
-{
-    std::filesystem::path scenePath;
-    std::filesystem::path controlProfilePath;
-    std::string networkServer = "127.0.0.1:40000";
-    uint8_t networkClientId = 0;
-    uint32_t frames = 0;
-    bool orbitCamera = false;
-    bool visualLab = false;
-    std::filesystem::path visualLabMovePath;
-    std::filesystem::path visualLabProxyAnimationPath;
-    std::filesystem::path visualLabScenarioPath;
-    vac::host::CommonHostOptions common;
-};
 
 struct QueueFamilyIndices
 {
@@ -128,13 +109,6 @@ struct PushConstants
     glm::vec4 color{1.0f};
 };
 
-struct CameraView
-{
-    glm::vec3 eye{0.0f};
-    glm::vec3 target{0.0f};
-    float worldRadius = 32.0f;
-};
-
 std::vector<char> readFile(const std::filesystem::path &path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -147,78 +121,6 @@ std::vector<char> readFile(const std::filesystem::path &path)
     file.seekg(0);
     file.read(buffer.data(), size);
     return buffer;
-}
-
-ViewerOptions parseOptions(int argc, char **argv)
-{
-    vac::host::CommandLine commandLine{argc, argv};
-    ViewerOptions options;
-    options.common = vac::host::parseCommonOptions(commandLine);
-    vac::host::rejectUnsupportedCommonOptions(
-        options.common, {"--scene", "--frames", "--ticks", "--result-file", "--offline", "--hidden-window"});
-
-    if (commandLine.consumeFlag("--visual-lab")) {
-        options.visualLab = true;
-    }
-
-    const vac::visual_lab::VisualLabAssetPaths labDefaults = vac::visual_lab::defaultVisualLabAssetPaths();
-    options.scenePath = options.visualLab
-        ? labDefaults.mapPath
-        : vac::defaultProjectRoot() / "config/scenes/bootstrap.scene.json";
-    options.controlProfilePath = vac::defaultControlProfilePath();
-    options.visualLabMovePath = labDefaults.movePath;
-    options.visualLabProxyAnimationPath = labDefaults.proxyAnimationPath;
-
-    if (options.common.scene.has_value()) {
-        options.scenePath = *options.common.scene;
-    }
-    if (options.common.frames.has_value()) {
-        options.frames = *options.common.frames;
-    }
-
-    if (const std::optional<std::string> controlProfile = commandLine.consumeValue("--control-profile")) {
-        options.controlProfilePath = *controlProfile;
-    }
-    if (const std::optional<std::string> movePath = commandLine.consumeValue("--move")) {
-        if (!options.visualLab) {
-            throw vac::host::ParseError("--move requires --visual-lab");
-        }
-        options.visualLabMovePath = *movePath;
-    }
-    if (const std::optional<std::string> animationPath = commandLine.consumeValue("--proxy-animation")) {
-        if (!options.visualLab) {
-            throw vac::host::ParseError("--proxy-animation requires --visual-lab");
-        }
-        options.visualLabProxyAnimationPath = *animationPath;
-    }
-    if (const std::optional<std::string> scenarioPath = commandLine.consumeValue("--scenario")) {
-        if (!options.visualLab) {
-            throw vac::host::ParseError("--scenario requires --visual-lab");
-        }
-        if (options.common.scene.has_value()) {
-            throw vac::host::ParseError("--scenario cannot be combined with --scene");
-        }
-        options.visualLabScenarioPath = *scenarioPath;
-    }
-    if (const std::optional<std::string> networkServer = commandLine.consumeValue("--net-server")) {
-        options.networkServer = *networkServer;
-    }
-    if (const std::optional<std::string> clientIdValue = commandLine.consumeValue("--net-client-id")) {
-        const int clientId = std::stoi(*clientIdValue);
-        if (clientId < 0 || clientId > 255) {
-            throw std::runtime_error("--net-client-id must be between 0 and 255");
-        }
-        options.networkClientId = static_cast<uint8_t>(clientId);
-    }
-    if (commandLine.consumeFlag("--orbit-camera")) {
-        options.orbitCamera = true;
-    }
-    if (commandLine.consumeFlag("--static-camera")) {
-        options.orbitCamera = false;
-    }
-    commandLine.rejectUnknown();
-
-    return options;
 }
 
 std::optional<std::filesystem::file_time_type> fileWriteTime(const std::filesystem::path &path)
@@ -252,7 +154,7 @@ std::array<VkVertexInputAttributeDescription, 3> vertexAttributeDescriptions()
 class VulkanSceneViewer
 {
 public:
-    explicit VulkanSceneViewer(ViewerOptions options)
+    explicit VulkanSceneViewer(vac::viewer::ViewerOptions options)
         : m_options(std::move(options))
     {
         loadInitialControlProfile();
@@ -302,7 +204,7 @@ public:
     const std::vector<std::string> &resultDiagnostics() const { return m_resultDiagnostics; }
 
 private:
-    ViewerOptions m_options;
+    vac::viewer::ViewerOptions m_options;
     vac::ControlProfile m_controlProfile;
     vac::ResolvedControlBindings m_bindings;
     std::optional<std::filesystem::file_time_type> m_controlProfileWriteTime;
@@ -355,7 +257,7 @@ private:
     uint32_t m_fpsFrames = 0;
     float m_cameraYawDegrees = 180.0f;
     float m_cameraPitchDegrees = 24.0f;
-    float m_cameraDistanceWorldUnits = kDefaultCameraDistanceWorldUnits;
+    float m_cameraDistanceWorldUnits = vac::viewer::kDefaultCameraDistanceWorldUnits;
     bool m_cameraSteeringEnabled = false;
     bool m_cameraToggleWasDown = false;
     bool m_mouseLookInitialized = false;
@@ -858,9 +760,9 @@ private:
         }
 
         m_cameraDistanceWorldUnits = std::clamp(
-            m_cameraDistanceWorldUnits - static_cast<float>(yOffset) * kCameraScrollZoomStepWorldUnits,
-            kMinCameraDistanceWorldUnits,
-            kMaxCameraDistanceWorldUnits);
+            m_cameraDistanceWorldUnits - static_cast<float>(yOffset) * vac::viewer::kCameraScrollZoomStepWorldUnits,
+            vac::viewer::kMinCameraDistanceWorldUnits,
+            vac::viewer::kMaxCameraDistanceWorldUnits);
     }
 
     void handleClickToMoveInput()
@@ -904,7 +806,7 @@ private:
         const float ndcX = static_cast<float>((cursorX / width) * 2.0 - 1.0);
         const float ndcY = static_cast<float>(1.0 - (cursorY / height) * 2.0);
 
-        const CameraView camera = cameraView();
+        const vac::viewer::CameraView camera = cameraView();
         const glm::vec3 viewForward = glm::normalize(camera.target - camera.eye);
         const glm::vec3 viewRight = glm::normalize(glm::cross(viewForward, glm::vec3{0.0f, 1.0f, 0.0f}));
         const glm::vec3 viewUp = glm::normalize(glm::cross(viewRight, viewForward));
@@ -2003,55 +1905,29 @@ private:
         }
     }
 
-    CameraView cameraView() const
+    vac::viewer::CameraView cameraView() const
     {
-        CameraView camera;
-        camera.worldRadius = m_scene.worldBounds.valid
-            ? std::max({m_scene.worldBounds.max.x - m_scene.worldBounds.min.x,
-                        m_scene.worldBounds.max.y - m_scene.worldBounds.min.y,
-                        m_scene.worldBounds.max.z - m_scene.worldBounds.min.z,
-                        18.0f}) * 0.5f
-            : 32.0f;
-
         vac::Transform anchorTransform;
         if (m_playerIndex.has_value()) {
             anchorTransform = presentationTransform(*m_playerIndex);
         }
 
-        const float yaw = glm::radians(m_cameraYawDegrees);
-        const float pitch = glm::radians(m_cameraPitchDegrees);
-        const glm::vec3 forward{std::sin(yaw), 0.0f, std::cos(yaw)};
-        const glm::vec3 right{std::cos(yaw), 0.0f, -std::sin(yaw)};
-        const glm::vec3 anchor = anchorTransform.translation + glm::vec3{0.0f, 6.5f, 0.0f};
-        const float cameraDistance = m_cameraDistanceWorldUnits;
-        const float shoulderBlend = std::clamp(cameraDistance / kCameraFirstPersonBlendDistanceWorldUnits,
-                                               0.0f,
-                                               1.0f);
-        glm::vec3 cameraOffset = -forward * (std::cos(pitch) * cameraDistance) +
-                                 right * (5.0f * shoulderBlend) +
-                                 glm::vec3{0.0f, std::sin(pitch) * cameraDistance, 0.0f};
-
-        if (m_options.orbitCamera) {
-            const float orbitRadians = m_sceneTimeSeconds * 0.22f;
-            const glm::mat4 orbit = glm::rotate(glm::mat4{1.0f}, orbitRadians, glm::vec3{0.0f, 1.0f, 0.0f});
-            cameraOffset = glm::vec3{orbit * glm::vec4{cameraOffset, 0.0f}};
-        }
-
-        camera.eye = anchor + cameraOffset;
-        camera.target = anchor + forward * 10.0f + glm::vec3{0.0f, 2.0f * shoulderBlend, 0.0f};
-        return camera;
+        return vac::viewer::buildCameraView({
+            .worldBoundsValid = m_scene.worldBounds.valid,
+            .worldBoundsMin = m_scene.worldBounds.min,
+            .worldBoundsMax = m_scene.worldBounds.max,
+            .anchorTranslation = anchorTransform.translation,
+            .yawDegrees = m_cameraYawDegrees,
+            .pitchDegrees = m_cameraPitchDegrees,
+            .distanceWorldUnits = m_cameraDistanceWorldUnits,
+            .sceneTimeSeconds = m_sceneTimeSeconds,
+            .orbitCamera = m_options.orbitCamera,
+        });
     }
 
     glm::mat4 viewProjection() const
     {
-        const CameraView camera = cameraView();
-        glm::mat4 view = glm::lookAt(camera.eye, camera.target, glm::vec3{0.0f, 1.0f, 0.0f});
-        glm::mat4 projection = glm::perspective(glm::radians(50.0f),
-                                                static_cast<float>(m_swapChainExtent.width) / static_cast<float>(m_swapChainExtent.height),
-                                                0.1f,
-                                                std::max(100.0f, camera.worldRadius * 6.0f));
-        projection[1][1] *= -1.0f;
-        return projection * view;
+        return vac::viewer::viewProjectionMatrix(cameraView(), m_swapChainExtent.width, m_swapChainExtent.height);
     }
 
     void pushDrawConstants(VkCommandBuffer commandBuffer,
@@ -2422,30 +2298,17 @@ int main(int argc, char **argv)
 {
     std::optional<std::filesystem::path> resultFile;
     try {
-        const ViewerOptions options = parseOptions(argc, argv);
+        const vac::viewer::ViewerOptions options = vac::viewer::parseOptions(argc, argv);
         resultFile = options.common.resultFile;
         VulkanSceneViewer viewer{options};
         viewer.run();
-        if (resultFile.has_value()) {
-            vac::host::HostResult result = vac::host::resultFromOptions("vulkan_scene_viewer", options.common);
-            result.message = options.visualLab
-                ? fmt::format("Visual lab rendered {} frame(s)", options.frames)
-                : options.frames > 0
-                ? fmt::format("Rendered {} frame(s)", options.frames)
-                : "Viewer exited normally";
-            result.diagnostics = viewer.resultDiagnostics();
-            vac::host::writeResultFile(*resultFile, result);
-        }
+        vac::viewer::writeSuccessResultFile(options, viewer.resultDiagnostics());
         return 0;
     } catch (const std::exception &error) {
         std::cerr << "vulkan_scene_viewer failed: " << error.what() << "\n";
         if (resultFile.has_value()) {
             try {
-                vac::host::HostResult result;
-                result.host = "vulkan_scene_viewer";
-                result.status = "error";
-                result.message = error.what();
-                vac::host::writeResultFile(*resultFile, result);
+                vac::viewer::writeErrorResultFile(*resultFile, error.what());
             } catch (const std::exception &resultError) {
                 std::cerr << "vulkan_scene_viewer could not write result file: " << resultError.what() << "\n";
             }

@@ -222,6 +222,28 @@ target_link_libraries(host_core PUBLIC
     nlohmann_json::nlohmann_json
 )
 
+add_library(viewer_core
+    src/viewer/viewer_camera.cpp
+    src/viewer/viewer_options.cpp
+)
+
+target_compile_features(viewer_core PUBLIC cxx_std_20)
+
+target_include_directories(viewer_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(viewer_core PUBLIC
+    host_core
+    glm::glm
+)
+
+target_link_libraries(viewer_core PRIVATE
+    scene_core
+    visual_lab_core
+    fmt::fmt
+)
+
 include(CTest)
 
 function(add_shader TARGET_NAME SOURCE_FILE)
@@ -362,8 +384,8 @@ target_compile_definitions(vulkan_scene_viewer PRIVATE
 )
 
 target_link_libraries(vulkan_scene_viewer PRIVATE
+    viewer_core
     scene_core
-    host_core
     input_core
     network_core
     visual_lab_core
@@ -505,6 +527,22 @@ if(BUILD_TESTING)
     set_tests_properties(visual_lab_tests PROPERTIES
         TIMEOUT 10
         LABELS "unit;viewer;visual;combat;map"
+    )
+
+    add_executable(viewer_module_tests
+        tests/viewer_module_tests.cpp
+    )
+
+    target_compile_features(viewer_module_tests PRIVATE cxx_std_20)
+
+    target_link_libraries(viewer_module_tests PRIVATE
+        viewer_core
+    )
+
+    add_test(NAME viewer_module_tests COMMAND viewer_module_tests)
+    set_tests_properties(viewer_module_tests PROPERTIES
+        TIMEOUT 10
+        LABELS "unit;viewer"
     )
 
     add_test(
