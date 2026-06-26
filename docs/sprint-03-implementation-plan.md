@@ -70,7 +70,7 @@ Initial required coverage:
 | Asset loading | no browser | input directory picker, rescan button, renderable asset list |
 | Animated armature assets | not imported as skeletal runtime data | skeleton/clip/skin import status, clip picker, preview scrub, socket/weapon attachment panel |
 | Weapon assets | currently provisional socket names in move/proxy data | weapon asset definition, grip socket, tip/base trail sockets, compatibility tags, preview attachment |
-| Effects/shaders | design-only | effect asset picker/editor, material/shader parameter controls, preview trigger button, validation |
+| Visual effects/shaders | design-only | visual-effect asset picker/editor, material/shader parameter controls, particle/trail controls, preview trigger button, validation |
 | Viewer render | separate executable | shared renderer path usable by editor viewport |
 | Game executable | no export path | export/build button, output directory input, generated manifest/result JSON |
 
@@ -149,6 +149,47 @@ The editor must expose:
 - validation that effect spawns consume combat events but do not define damage, hit validity, invulnerability, or authoritative gameplay state
 - fallback/error material and missing shader diagnostics
 
+### Visual Effects Authoring POC
+
+Sprint 03 should include a deliberately small visual-effects authoring proof of concept:
+
+```text
+effect.sword_swing_poc
+  material: unlit/additive color parameters
+  nodes:
+    - particle burst at a chosen socket or offset
+    - weapon trail sampled between weapon_base and weapon_tip
+  preview:
+    - free preview at editor origin
+    - weapon-swing preview when a character/weapon clip is available
+```
+
+The POC is visual only. It must not author damage, hit rules, target filters, area-of-effect truth, invulnerability, cancels, or combat timing. It may bind to a combat event for preview, but combat remains the source of truth.
+
+Minimum editor controls:
+
+- effect asset path or picker
+- `Preview Effect` button
+- material/shader mode combo, initially `unlit` and optional `additive`
+- color RGBA controls
+- duration ticks, guarded to a documented range
+- particle count, guarded to a documented range
+- particle lifetime ticks, size, speed, spread, gravity, and drag
+- spawn tick and spawn socket/offset
+- trail enable toggle
+- trail base socket, tip socket, width, lifetime, and fade controls
+
+Minimum result diagnostics:
+
+- selected effect logical ID
+- material/shader mode
+- node count
+- particle count
+- duration ticks
+- spawn socket or offset
+- trail enabled/base/tip sockets
+- preview status and validation diagnostics
+
 ### Produce The Game Executable
 
 Sprint 03 should define and implement a testable v1 export path:
@@ -207,11 +248,11 @@ Branch: `sprint03/sp3-007-animated-armature-weapon-preview`
 
 Goal: import or classify skeletal source assets, expose skeleton/clip/socket metadata in the editor, preview a clip at fixed ticks, attach a weapon to a named socket, and validate weapon trail/socket contracts.
 
-### SP3-008: Effects, Materials, and Shader Contract v1
+### SP3-008: Visual Effects Authoring POC v1
 
-Branch: `sprint03/sp3-008-effects-materials-shader-contract`
+Branch: `sprint03/sp3-008-visual-effects-authoring-poc`
 
-Goal: define the initial engine/editor contract for material shader parameters and gameplay-triggered visual effects, with labeled editor controls and validation that effects consume gameplay events without owning combat truth.
+Goal: implement a minimal engine/editor-owned visual-effects authoring proof of concept with material/shader parameters, particle burst controls, weapon trail controls, preview trigger, validation, and result diagnostics.
 
 ## Recommended Order
 
@@ -223,10 +264,10 @@ SP3-004 renderable asset browser
 SP3-005 guarded datapoint controls
 SP3-006 game executable export
 SP3-007 animated armature and weapon preview
-SP3-008 effects/materials/shader contract
+SP3-008 visual effects authoring POC
 ```
 
-`SP3-004` can run in parallel with late `SP3-002` work if it only touches editor data scanning/UI and not shared renderer modules. `SP3-005` should wait until `SP3-001` defines labels/ranges and until its edited surfaces are clear. `SP3-007` depends on at least basic asset browsing/import status from `SP3-004` and should not wait for production cooking. `SP3-008` can start as schema/editor contract work after `SP3-001`, but renderer shader integration should wait for renderer module boundaries. `SP3-006` should wait until the editor scene/config ownership path is stable enough to export.
+`SP3-004` can run in parallel with late `SP3-002` work if it only touches editor data scanning/UI and not shared renderer modules. `SP3-005` should wait until `SP3-001` defines labels/ranges and until its edited surfaces are clear. `SP3-007` depends on at least basic asset browsing/import status from `SP3-004` and should not wait for production cooking. `SP3-008` can start as schema/editor authoring work after `SP3-001`; weapon-trail preview becomes richer after `SP3-007`, while renderer shader integration should wait for renderer module boundaries. `SP3-006` should wait until the editor scene/config ownership path is stable enough to export.
 
 ## Verification Gates
 

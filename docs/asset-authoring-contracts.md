@@ -91,6 +91,48 @@ Effects consume combat events. They must not define damage, hit validity, invuln
 
 Shader source and runtime shader variants are engine code/assets. The editor should expose material parameters and effect controls rather than asking Maya to define engine shader behavior.
 
+## Visual Effects Authoring POC
+
+The first useful effect-authoring milestone should be small and tactile:
+
+```text
+effect.sword_swing_poc
+  material/shader: unlit or additive color
+  particle node: burst from a socket or offset
+  trail node: ribbon/line between weapon_base and weapon_tip
+  preview: explicit editor button
+```
+
+Required editor-authored fields:
+
+- effect logical ID
+- duration in ticks
+- material/shader mode
+- RGBA color
+- particle count
+- particle lifetime in ticks
+- particle size, speed, spread, gravity, and drag
+- spawn tick
+- spawn socket or offset
+- trail enabled flag
+- trail base socket, tip socket, width, lifetime, and fade
+
+Suggested guard ranges for the POC:
+
+- duration ticks: `1..600`
+- spawn tick: `0..durationTicks`
+- particle count: `0..512`
+- particle lifetime ticks: `1..240`
+- particle size: `0.001..10.0`
+- speed: `0.0..50.0`
+- spread degrees: `0.0..180.0`
+- gravity scale: `-10.0..10.0`
+- drag: `0.0..20.0`
+- trail width: `0.001..2.0`
+- color channels: `0.0..1.0`
+
+The POC may preview from an editor origin or a named socket. Once character/weapon preview exists, it should also preview the weapon trail during a swing clip. It still remains visual-only: damage, hit validity, target filters, and area rules stay in combat/move data.
+
 ## Import Validation Requirements
 
 Every imported animated asset should eventually produce a semantic manifest with:
