@@ -21,6 +21,8 @@ A user should be able to:
 4. Point the editor at an input directory and discover renderable assets.
 5. Export or build a runnable "game" executable/package from the current scene/config.
 6. Keep `vulkan_scene_viewer` behavior intact while its 2.5k-line implementation is split into maintainable modules.
+7. Import, inspect, and preview animated armature assets with weapon attachment sockets so real Maya-authored animation sets can be used in the editor.
+8. Define effects, materials, and shader parameters as engine/editor assets, with DCC-authored textures/meshes acting as source inputs rather than the source of gameplay semantics.
 
 ## Sprint Reset Decision
 
@@ -66,6 +68,9 @@ Initial required coverage:
 | Visual lab playback | play/step/reset/seek | keep controls, label/guard seek range, connect to current scene |
 | Map authoring/runtime compile | reload/build buttons | explicit build/compile controls and diagnostics |
 | Asset loading | no browser | input directory picker, rescan button, renderable asset list |
+| Animated armature assets | not imported as skeletal runtime data | skeleton/clip/skin import status, clip picker, preview scrub, socket/weapon attachment panel |
+| Weapon assets | currently provisional socket names in move/proxy data | weapon asset definition, grip socket, tip/base trail sockets, compatibility tags, preview attachment |
+| Effects/shaders | design-only | effect asset picker/editor, material/shader parameter controls, preview trigger button, validation |
 | Viewer render | separate executable | shared renderer path usable by editor viewport |
 | Game executable | no export path | export/build button, output directory input, generated manifest/result JSON |
 
@@ -114,6 +119,35 @@ The editor must accept an input directory, scan for renderable assets, and prese
 - `.fbx`
 
 `.zip` files may be listed and classified by contained extensions, but direct import from archives is optional unless a ticket explicitly adds extraction/import handling.
+
+### Animated Armature and Weapon Loading
+
+Model loading and game-mechanic definition for animated armatures are hard editor requirements, not optional polish.
+
+The editor must eventually support:
+
+- source import for skeletal meshes, skeletons, skins, and animation clips
+- stable character, skeleton, animation set, weapon, socket, and effect asset IDs
+- clip preview with tick/frame scrub and clear bounds
+- named socket display/edit/save, especially `hand_r`, `hand_l`, `weapon_tip`, and `weapon_base`
+- weapon attachment preview against a selected character/clip
+- validation that move hitboxes and weapon trails reference existing sockets
+- deterministic fixed-tick pose sampling that can run headlessly without Vulkan
+- result diagnostics for bone count, clip count, socket count, selected clip/tick, and attached weapon transform
+
+Initial engine coordinate contract remains `RH_Y_UP_NEG_Z_FORWARD` with `unitsPerMeter = 1.0`; import settings must record any Maya/FBX axis and unit conversion.
+
+### Effects, Materials, and Shaders
+
+Effects and shaders are engine/editor-owned assets. DCC tools may provide source meshes, textures, UVs, vertex colors, named locators, and animation events, but gameplay effect behavior must be defined and validated in engine data.
+
+The editor must expose:
+
+- material/shader parameter controls with labels and ranges
+- effect asset controls for lifetime, timing, spawn socket, trail sockets, color/size/alpha curves, particle counts, and camera/audio cues when supported
+- a preview trigger button for effects independent of combat truth
+- validation that effect spawns consume combat events but do not define damage, hit validity, invulnerability, or authoritative gameplay state
+- fallback/error material and missing shader diagnostics
 
 ### Produce The Game Executable
 
@@ -167,6 +201,18 @@ Branch: `sprint03/sp3-006-game-executable-export-v1`
 
 Goal: add a v1 editor/build pipeline that produces a runnable game executable/package from the current scene/config and verifies it with a launch smoke.
 
+### SP3-007: Animated Armature and Weapon Preview v1
+
+Branch: `sprint03/sp3-007-animated-armature-weapon-preview`
+
+Goal: import or classify skeletal source assets, expose skeleton/clip/socket metadata in the editor, preview a clip at fixed ticks, attach a weapon to a named socket, and validate weapon trail/socket contracts.
+
+### SP3-008: Effects, Materials, and Shader Contract v1
+
+Branch: `sprint03/sp3-008-effects-materials-shader-contract`
+
+Goal: define the initial engine/editor contract for material shader parameters and gameplay-triggered visual effects, with labeled editor controls and validation that effects consume gameplay events without owning combat truth.
+
 ## Recommended Order
 
 ```text
@@ -176,9 +222,11 @@ SP3-003 editor current-scene rendering
 SP3-004 renderable asset browser
 SP3-005 guarded datapoint controls
 SP3-006 game executable export
+SP3-007 animated armature and weapon preview
+SP3-008 effects/materials/shader contract
 ```
 
-`SP3-004` can run in parallel with late `SP3-002` work if it only touches editor data scanning/UI and not shared renderer modules. `SP3-005` should wait until `SP3-001` defines labels/ranges and until its edited surfaces are clear. `SP3-006` should wait until the editor scene/config ownership path is stable enough to export.
+`SP3-004` can run in parallel with late `SP3-002` work if it only touches editor data scanning/UI and not shared renderer modules. `SP3-005` should wait until `SP3-001` defines labels/ranges and until its edited surfaces are clear. `SP3-007` depends on at least basic asset browsing/import status from `SP3-004` and should not wait for production cooking. `SP3-008` can start as schema/editor contract work after `SP3-001`, but renderer shader integration should wait for renderer module boundaries. `SP3-006` should wait until the editor scene/config ownership path is stable enough to export.
 
 ## Verification Gates
 
@@ -198,7 +246,7 @@ Minimum gates:
 
 - Reopening `SP2-005` network compatibility without explicit dispatch.
 - Full production asset cooking/import.
-- Full skeletal animation, material graph, particle/effect editor, or animation graph editor.
+- Production-grade retargeting, full animation graph editor, full material graph, or full particle/effect editor.
 - Rolling authoritative networked gameplay into the editor export path.
 - Rewriting combat truth into UI/viewer code.
 - Making screenshots the gameplay correctness oracle.
