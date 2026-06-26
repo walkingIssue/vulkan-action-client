@@ -61,6 +61,12 @@ Run targeted tests first, then the affected subsystem/contract presets required 
 
 Clear `VAC_UPDATE_GOLDENS` for normal verification. Follow the guarded golden workflow for intentional updates.
 
+## Visual QA and Editor Work
+
+For UI, editor, viewer, Vulkan rendering, ImGui, map preview, visual lab, model loading, debug draw, screenshot, or layout changes, read `.agents/skills/visual-qa/SKILL.md` and provide screenshot-based evidence unless capture is unavailable.
+
+The provisional editor executable is `game_editor`. Its current status and limits are documented in `docs/game-editor-bootstrap-status.md`. At this stage it is an inspection and preview shell; do not assume it can author or save gameplay/effect datapoints from the UI unless a later ticket explicitly adds editable controls and persistence.
+
 ## Records
 
 Use direct messages for live coordination. Do not duplicate them into status, inbox, claim, decision, and merge files.

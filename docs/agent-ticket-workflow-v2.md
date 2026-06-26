@@ -369,13 +369,17 @@ Record any failure in the result document and make the process report to stderr/
 
 ## Visual Inspection
 
-When a ticket requires native viewer inspection:
+When a ticket changes UI, editor, viewer, Vulkan rendering, ImGui, map preview, visual lab, model loading, debug draw, screenshots, or layout, read `.agents/skills/visual-qa/SKILL.md`.
+
+For `vulkan_scene_viewer`, use the capture helper when it applies:
 
 ```powershell
 .\tools\capture-scene-viewer.ps1
 ```
 
-Record the PNG/JSON artifact path. Visual evidence supplements but does not replace headless correctness or structured result evidence.
+For `game_editor`, build the target, launch a visible or capturable run, interact with the relevant ImGui panel, and capture the displayed state. Record the PNG/JSON artifact path. Visual evidence supplements but does not replace headless correctness or structured result evidence.
+
+If capture is unavailable, say so explicitly and keep nonvisual build/test evidence separate from visual claims.
 
 ## READY Contract
 
