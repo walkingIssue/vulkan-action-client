@@ -6,6 +6,11 @@ The provisional editor shell landed in `045551a Add game editor bootstrap and vi
 
 Sprint 03 restarts active editor work around UI coverage, current-scene rendering, renderable asset discovery, viewer extraction, animated armature/weapon preview, effects/shader contracts, and game executable export. See `docs/sprint-03-implementation-plan.md` and `docs/asset-authoring-contracts.md`.
 
+The authoritative Sprint 03 feature-to-UI contract matrix is
+`docs/sprint-03-editor-ui-contract-matrix.md`. Later editor tickets should cite
+that matrix for labels, control types, guards/ranges, disabled/error states,
+result diagnostic keys, and visual-QA expectations.
+
 ## What Exists
 
 - `game_editor` is a separate CMake executable backed by GLFW, Vulkan, and ImGui.
@@ -68,4 +73,6 @@ For editor or visual changes:
 2. Run `game_editor_headless_smoke` or the affected process smoke test.
 3. Launch a visible or capturable editor run.
 4. Capture and inspect at least one screenshot of the relevant ImGui panel.
-5. Report any blocked visual capture separately from build/test evidence.
+5. Check the relevant labels, guards, diagnostics, and expected visible state
+   against `docs/sprint-03-editor-ui-contract-matrix.md`.
+6. Report any blocked visual capture separately from build/test evidence.
