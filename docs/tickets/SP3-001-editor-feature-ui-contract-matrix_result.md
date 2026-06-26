@@ -2,8 +2,9 @@
 
 Status: ready for merge
 Branch: `sprint03/sp3-001-editor-feature-ui-contract-matrix`
-Start commit: `019a2b45abd100ab1157c575ee00f7acb1acb518`
-Implementation commit: `b44b0bb606509a24c75ad1c576f4cdb3c8c3ed3d`
+Start commit: `d0bae5cf6983435d41ddf4c1a753b9b402d3a7a0`
+Implementation commit: `b32aa4b6e78b78df6db9aa15503eaed6fe8e84f2`
+Final candidate commit: reported in the `READY` payload after this result metadata update
 
 ## What Changed
 
