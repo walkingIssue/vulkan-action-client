@@ -320,6 +320,31 @@ target_link_libraries(combat_scenario_runner PRIVATE
     host_core
 )
 
+add_executable(game_editor
+    src/game_editor.cpp
+)
+
+target_compile_features(game_editor PRIVATE cxx_std_20)
+
+target_compile_definitions(game_editor PRIVATE
+    VULKAN_ACTION_CLIENT_PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_link_libraries(game_editor PRIVATE
+    animation_core
+    combat_scenario_core
+    content_core
+    host_core
+    map_command_core
+    visual_lab_core
+    Vulkan::Vulkan
+    fmt::fmt
+    glfw
+    glm::glm
+    imgui::imgui
+    nlohmann_json::nlohmann_json
+)
+
 add_executable(vulkan_scene_viewer
     src/vulkan_scene_viewer.cpp
 )
@@ -761,5 +786,19 @@ if(BUILD_TESTING)
         TIMEOUT 10
         WILL_FAIL TRUE
         LABELS "combat;scenario;process"
+    )
+
+    add_test(
+        NAME game_editor_headless_smoke
+        COMMAND game_editor
+                --headless
+                --scene "${CMAKE_CURRENT_SOURCE_DIR}/content/maps/basic_primitive_arena.map.json"
+                --command-script "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/commands/wire_arena.commands.json"
+                --scenario "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/scenarios/sword_light_hits_idle_target.scenario.json"
+                --result-file "${CMAKE_CURRENT_BINARY_DIR}/test-artifacts/game_editor_headless_result.json"
+    )
+    set_tests_properties(game_editor_headless_smoke PROPERTIES
+        TIMEOUT 20
+        LABELS "editor;process;content;combat;visual"
     )
 endif()

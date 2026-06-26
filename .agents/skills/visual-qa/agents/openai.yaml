@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual QA"
+  short_description: "Verify rendered UI and visual output"
+  default_prompt: "Use $visual-qa to verify the app's rendered output after this UI or rendering change."
